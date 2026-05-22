@@ -54,6 +54,16 @@ bool can_use_582_controls = false;
 // .rc gets the final say on whether the feature is available at all.
 static bool s_console_menu_user_disabled = false;
 
+// Our own view of whether the user has toggled the console hidden.
+// We can't use IsWindowVisible(GetConsoleWindow()) for this because on
+// Win10/11 with Windows Terminal as the default conhost, GetConsoleWindow
+// returns a permanently-hidden pseudo-window owned by conhost.exe - the
+// visible Terminal UI is a separate process. So IsWindowVisible says
+// "hidden" even though the user can see the console fine. Track intent
+// instead: starts false (we only attach a console when --debug, and the
+// attach intends it to be visible), flips on every successful toggle.
+static bool s_console_hidden = false;
+
 // Whether window was minimized or not
 static bool s_was_minimized = false;
 
@@ -210,14 +220,15 @@ static void UpdateConsoleToggleMenu(HWND hWnd) {
     return;
   }
   EnableMenuItem(menu, IDM_CONSOLE, MF_BYCOMMAND | MF_ENABLED);
-  const HWND console = logging::GetCurrentConsole();
-  const bool visible = (console != nullptr) && (IsWindowVisible(console) != 0);
+  // Label off our own intent bool (see s_console_hidden comment for why
+  // we don't query IsWindowVisible here).
   // SetMenuItemInfoW with MIIM_STRING copies the string, so passing a
   // string-literal pointer through const_cast is safe.
   MENUITEMINFOW mii = {};
   mii.cbSize        = sizeof(mii);
   mii.fMask         = MIIM_STRING;
-  mii.dwTypeData    = const_cast<LPWSTR>(visible ? kHideConsoleLabel : kShowConsoleLabel);
+  mii.dwTypeData =
+      const_cast<LPWSTR>(s_console_hidden ? kShowConsoleLabel : kHideConsoleLabel);
   SetMenuItemInfoW(menu, IDM_CONSOLE, FALSE, &mii);
 }
 
@@ -483,14 +494,22 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (s_console_menu_user_disabled) {
             break;
           }
-          const HWND console = logging::GetCurrentConsole();
-          if (console == nullptr) {
+          if (!logging::GetIsConsoleAttached()) {
             break;
           }
-          if (IsWindowVisible(console)) {
-            logging::HideConsole();
+          // Drive the flip off our intent bool, not IsWindowVisible -
+          // see s_console_hidden's comment for the Win11 Terminal
+          // pseudo-window quirk. Only flip the bool if the actual
+          // Show/Hide call succeeded so a failed SW_HIDE (which can
+          // happen on Win11 Terminal) doesn't leave the label lying.
+          if (s_console_hidden) {
+            if (logging::ShowConsole(false)) { // false = don't steal focus
+              s_console_hidden = false;
+            }
           } else {
-            logging::ShowConsole(false); // false = don't steal focus
+            if (logging::HideConsole()) {
+              s_console_hidden = true;
+            }
           }
           UpdateConsoleToggleMenu(hWnd);
           break;
