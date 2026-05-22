@@ -319,6 +319,22 @@ void PrintOutputSeparator() {
   SendOutputMessage(std::wstring(kSeparatorWidth, L'*'));
 }
 
+void EmitLine(const std::wstring& msg, bool is_error) {
+  // LOG sink is silent in release; SendOutputMessage always shows
+  // (when the edit exists). Both are thread-safe: LOG has its own
+  // mutex, SendMessageW marshals across thread boundaries.
+  //
+  // Two literal LOG() calls instead of one taking a runtime level -
+  // LOG(level) token-pastes `LOG_##level`, so it only accepts literal
+  // identifiers (INFO / ERROR / ...), not a variable.
+  if (is_error) {
+    LOG(ERROR) << msg;
+  } else {
+    LOG(INFO) << msg;
+  }
+  SendOutputMessage(msg);
+}
+
 void ClearOutput() {
   if (hOutputEdit == nullptr) {
     return;

@@ -38,6 +38,10 @@ void SendOutputMessage(const std::wstring& msg);
 // Used to break up sections of the log without spamming the console.
 void PrintOutputSeparator();
 
+// Prints a line to console (LOG(ERROR) when is_error, LOG(INFO)
+// otherwise) and also appends it to the output edit control.
+void EmitLine(const std::wstring& msg, bool is_error);
+
 // Wipes the output edit. No-op if the control hasn't been created yet.
 void ClearOutput();
 

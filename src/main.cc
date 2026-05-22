@@ -468,9 +468,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         case IDM_ABOUT:
         case IDC_ABOUT_BUTTON:
-          if (g_sound_on) {
-            PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
-          }
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_ABOUTDLG), hWnd, AboutDlgProc);
           break;
         case IDC_START_BUTTON: {
@@ -478,6 +475,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           const int threads = GetSelectedThreads();
           if (digits < 0 || threads < 0) {
             SendOutputMessage(L"Custom selection is not yet supported.");
+            StopCalculation();
             break;
           }
           if (!StartCalculation(digits, threads)) {
@@ -486,7 +484,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDC_STOP_BUTTON:
+          if (!g_running) {
+            EmitLine(L"No Pi threads running", false);
+          }
           StopCalculation();
+          PlayWav(IDR_OHNO_WAV);
           break;
         case IDM_HELP:
           LaunchHelp(hWnd);
@@ -607,6 +609,9 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
       static const HICON kAboutIcon = LoadIconW(g_hInstance, MAKEINTRESOURCEW(IDI_ABOUT));
       SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kAboutIcon);
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kAboutIcon);
+      if (g_sound_on) {
+        PlayWav(IDR_NOTIFY_WAV);
+      }
       return TRUE;
     case WM_CLOSE:
       EndDialog(hDlg, TRUE);

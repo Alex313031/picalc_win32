@@ -41,6 +41,7 @@
 #include "controls.h"
 #include "resource.h"
 #include "strings.h"
+#include "utils.h"
 
 namespace {
 
@@ -93,14 +94,6 @@ struct CalcArgs {
 // Helpers
 // =========================================================================
 
-void EmitLine(const std::wstring& msg) {
-  // LOG sink is silent in release; SendOutputMessage always shows
-  // (when the edit exists). Both are thread-safe: LOG has its own
-  // mutex, SendMessageW marshals across thread boundaries.
-  LOG(INFO) << msg;
-  SendOutputMessage(msg);
-}
-
 inline bool StopRequested() {
   return g_stop_requested.load(std::memory_order_relaxed);
 }
@@ -136,7 +129,7 @@ void NoteCombineComplete(int depth) {
     std::wostringstream m;
     m << L"Merge level " << depth << L" of " << g_start_depth << L" done ("
       << expected << L" mpf multiply, " << (elapsed_ms / 1000.0) << L"s. elapsed)";
-    EmitLine(m.str());
+    EmitLine(m.str(), false);
   }
 }
 
@@ -330,13 +323,13 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   // Banner: "Started Calculating N digits (Threads: T)".
   std::wostringstream banner;
   banner << kCalculateMessage << digits << L" digits (Threads: " << threads << L")";
-  EmitLine(banner.str());
+  EmitLine(banner.str(), false);
 
   const DWORD t_start = GetTickCount();
   g_calc_start_tick   = t_start;
 
   // GMP precision: digits * log2(10) + guard bits.
-  const long prec_bits = static_cast<long>(digits * 3.4) + 64;
+  const long long prec_bits = static_cast<long>(digits * 3.4) + 64;
   mpf_set_default_prec(prec_bits);
 
   // Kick off sqrt(10005) on its own worker. It needs the default mpf
@@ -385,7 +378,7 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   if (StopRequested()) {
     std::wostringstream m;
     m << kStoppedMessage << digits << L" digits.";
-    EmitLine(m.str());
+    EmitLine(m.str(), false);
     g_running = false;
     return 0;
   }
@@ -403,36 +396,36 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
     const DWORD elapsed = GetTickCount() - mpf_start;
     std::wostringstream m;
     m << L"Computed final Pi (mpf divide, " << (elapsed / 1000.0) << L"s. elapsed)";
-    EmitLine(m.str());
+    EmitLine(m.str(), false);
   }
 
   if (StopRequested()) {
     std::wostringstream m;
     m << kStoppedMessage << digits << L" digits.";
-    EmitLine(m.str());
+    EmitLine(m.str(), false);
     g_running = false;
     return 0;
   }
 
   std::wostringstream iter_line;
   iter_line << kIterMessage << N;
-  EmitLine(iter_line.str());
+  EmitLine(iter_line.str(), false);
 
   const DWORD t_end     = GetTickCount();
   const DWORD elapsedMs = t_end - t_start;
   std::wostringstream time_line;
   time_line << kTimeMessage << (elapsedMs / 1000.0) << L" seconds elapsed";
-  EmitLine(time_line.str());
+  EmitLine(time_line.str(), false);
   SendOutputMessage(L"Done Calculating Pi!");
   // Result, iterations (= BS leaves used), and elapsed time.
   // Format pi to decimal. With the kMaxPrintNumDigits cap, FormatPi
   // only converts the digits we'll actually show - cheap. Without
   // the cap, this is the second single-threaded GMP hotspot (after
   // mpf_div above), hence the timing line.
-  EmitLine(L"Formatting result to decimal.");
+  EmitLine(L"Formatting result to decimal.", false);
   const std::wstring outpi       = FormatPi(pi, digits, kMaxPrintNumDigits);
   // Emit final Pi output to hOutputEdit
-  EmitLine(std::wstring(L"Result: ") + outpi);
+  EmitLine(std::wstring(L"Result: ") + outpi, false);
 
   PrintOutputSeparator();
 
@@ -441,7 +434,9 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   // we don't block the worker. PlaySoundW is documented thread-safe;
   // the stop-check above ensures we don't chime on a cancelled run.
   if (g_sound_on) {
-    PlaySoundW(MAKEINTRESOURCEW(IDR_TADA_WAV), g_hInstance, SND_RESOURCE | SND_ASYNC);
+    if (!PlayWav(IDR_TADA_WAV)) {
+      EmitLine(L"Failed to play tada.wav", true);
+    }
   }
 
   g_running = false;

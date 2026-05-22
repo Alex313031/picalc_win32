@@ -88,4 +88,7 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon);
 // Welcome message to be displayed in console
 const std::wstring GetWelcomeMessage();
 
+// Plays a given .wav resource ID.
+bool PlayWav(UINT resid);
+
 #endif // PICALCWIN32_UTILS_H_

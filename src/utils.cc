@@ -305,7 +305,7 @@ bool ToggleMenuCheck(HWND hWnd, UINT id) {
 // Confirmation dialog for exit
 bool ConfirmExit(HWND hWnd) {
   const int exit_dialog = MessageBoxW(hWnd, L"Are you sure you want to Exit?", L"Confirm Exit",
-                                      MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
+                                      MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON1);
   return exit_dialog == IDYES;
 }
 
@@ -352,6 +352,7 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
                       SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
 }
 
+// Log name and version
 const std::wstring GetWelcomeMessage() {
   std::wostringstream wostr;
   wostr << L"---- Welcome to " << GetAppName() << L" ----" << L"\n"
@@ -359,4 +360,19 @@ const std::wstring GetWelcomeMessage() {
         << (is_debug ? L" DEBUG" : L"");
   const std::wstring welcome = wostr.str();
   return welcome;
+}
+
+// One shot play of embedded .wav file
+bool PlayWav(UINT resid) {
+  if (resid < IDR_MAIN) {
+    LOG(ERROR) << L"Resource ID too low";
+    return false;
+  }
+  static const DWORD playflags = SND_RESOURCE | SND_ASYNC | SND_NODEFAULT;
+  const bool played =
+      PlaySoundW(MAKEINTRESOURCEW(resid), g_hInstance, playflags);
+  if (!played) {
+    LOG(ERROR) << L"Failed to play embedded .wav file " << resid;
+  }
+  return played;
 }
