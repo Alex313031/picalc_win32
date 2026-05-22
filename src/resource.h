@@ -26,9 +26,10 @@
 #define IDM_SOUND                   250
 #define IDM_CONSOLE                 251
 
-// Embedded background-music WAV. The RC file binds this ID
-// to res/tada.wav;
+// Embedded background sound WAV files
 #define IDR_TADA_WAV                500
+#define IDR_OHNO_WAV                501
+#define IDR_NOTIFY_WAV              502
 
 /* Child control IDs */
 #define IDC_OUTPUT_EDIT             600

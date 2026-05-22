@@ -34,6 +34,8 @@ IDI_ABOUT  ICON  "res/about.ico"
 
 // Embedded sounds
 IDR_TADA_WAV     WAVE  "res/tada.wav"
+IDR_OHNO_WAV     WAVE  "res/ohno.wav"
+IDR_NOTIFY_WAV   WAVE  "res/notify.wav"
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE LANG_ENGLISH, SUBLANG_NEUTRAL
