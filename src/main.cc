@@ -340,10 +340,20 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0)) {
-    if (!TranslateAcceleratorW(mainHwnd, hAccel, &msg)) {
-      TranslateMessage(&msg);
-      DispatchMessageW(&msg);
+    // Accelerator first so menu shortcuts (Ctrl+Q, '?', etc.) win
+    // over any TAB/arrow handling. Then IsDialogMessageW gives us
+    // dialog-style navigation in the top pane (TAB / Shift+TAB
+    // between WS_TABSTOP controls, arrows inside combos, Enter for
+    // the default button) which a plain WM_KEYDOWN dispatch on a
+    // non-dialog window wouldn't.
+    if (TranslateAcceleratorW(mainHwnd, hAccel, &msg)) {
+      continue;
     }
+    if (IsDialogMessageW(mainHwnd, &msg)) {
+      continue;
+    }
+    TranslateMessage(&msg);
+    DispatchMessageW(&msg);
   }
   if (hAccel != nullptr) {
     DestroyAcceleratorTable(hAccel);
