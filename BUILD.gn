@@ -14,6 +14,8 @@ executable("picalc") {
     "src/globals.h",
     "src/main.cc",
     "src/main.h",
+    "src/picalc.cc",
+    "src/picalc.h",
     "src/picalc.rc",
     "src/resource.h",
     "src/strings.h",
