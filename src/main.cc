@@ -271,9 +271,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // any of these flags, the log sink defaults to LOG_NONE - LOG() calls
   // become near-no-ops, useful in release.
   const bool open_console = g_debug_mode || g_show_version || g_show_help;
-  const logging::LogDest kLogSink =
-      open_console ? g_debug_mode ? logging::LOG_TO_ALL : logging::LOG_TO_STDERR
-                   : logging::LOG_TO_STDERR;
+  logging::LogDest kLogSink = logging::LOG_TO_ALL;
   static const std::wstring file_name = std::wstring(INTERNAL_NAME);
   const std::wstring kLogFile         = file_name + L".log";
   logging::LogInitSettings LoggingSettings;
@@ -289,18 +287,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 3;
   }
   logging::SetIsDCheck(is_dcheck);
-  // We always attach a console (so the Dev -> Console menu is useful
-  // even in release builds), but unless we're in a mode that actually
-  // wants it visible right now - --debug for live logging, --version
-  // or --help for one-shot output before exit - hide it immediately
-  // so a normal launch doesn't pop a console window the user didn't
-  // ask for. Logs still flow to the hidden stream; "Show Console"
-  // reveals it any time.
-  if (!g_debug_mode && !g_show_version && !g_show_help) {
-    if (logging::HideConsole()) {
-      s_console_hidden = true;
-    }
-  }
   if (g_show_version) {
     return ShowVersionAndExit();
   }
@@ -316,6 +302,19 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   if (!RegisterWndClass(g_hInstance, szClassName)) {
     ErrorBox(nullptr, L"RegisterClassEx Error", L"This program requires Windows NT!");
     return 1;
+  }
+
+  // We always attach a console (so the Dev -> Console menu is useful
+  // even in release builds), but unless we're in a mode that actually
+  // wants it visible right now - --debug for live logging, --version
+  // or --help for one-shot output before exit - hide it immediately
+  // so a normal launch doesn't pop a console window the user didn't
+  // ask for. Logs still flow to the hidden stream; "Show Console"
+  // reveals it any time.
+  if (!g_debug_mode && !g_show_version && !g_show_help) {
+    if (logging::HideConsole()) {
+      s_console_hidden = true;
+    }
   }
 
   // Open our window now
@@ -509,6 +508,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             break;
           }
           if (!logging::GetIsConsoleAttached()) {
+            LOG(ERROR) << L"No console attached to window";
             break;
           }
           // Drive the flip off our intent bool, not IsWindowVisible -
@@ -519,10 +519,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (s_console_hidden) {
             if (logging::ShowConsole(false)) { // false = don't steal focus
               s_console_hidden = false;
+              LOG(DEBUG) << L"Showed console.";
+            } else {
+              LOG(ERROR) << L"Failed to show console!";
             }
           } else {
             if (logging::HideConsole()) {
               s_console_hidden = true;
+              LOG(DEBUG) << L"Hid console.";
+            } else {
+              LOG(ERROR) << L"Failed to hide console!";
             }
           }
           UpdateConsoleToggleMenu(hWnd);
