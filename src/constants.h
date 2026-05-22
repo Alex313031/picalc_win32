@@ -50,7 +50,7 @@ inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 
 // 100 max digits printable in output area, any more and it will only output
 // the full result to a text file, truncating to this in the output area.
-inline constexpr UINT kMaxPrintNumDigits = 100;
+inline constexpr UINT kMaxPrintNumDigits = 32;
 
 inline constexpr UINT kMinNumThreads = 1u; // Need at least 1 thread
 inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this

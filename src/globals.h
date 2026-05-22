@@ -26,6 +26,8 @@ extern HWND hAboutButton;   // "About" button
 
 extern volatile bool g_running;  // True while a pi calculation is in progress
 
+extern bool g_sound_on; // Mirrors the Settings -> Sound? menu check state
+
 extern bool can_use_582_controls; // Whether we can use "modern" common controls from XP+
 
 extern COLORREF g_bkg_color; // Window background color

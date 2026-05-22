@@ -34,6 +34,12 @@ int cyClient = 0;
 // Whether Pi Calculation is currently running
 volatile bool g_running = false;
 
+// Mirrors the Settings -> Sound? menu check state. Polled by picalc.cc
+// before playing the completion chime. Initial value matches the .rc's
+// CHECKED flag (true); ApplyMenuDefaults latches the .rc state into it
+// at startup and the IDM_SOUND handler keeps it in sync on toggle.
+bool g_sound_on = true;
+
 bool g_debug_mode = is_debug;
 // CLI flags. Set by ParseCommandLine before InitLogging runs so the log
 // sink picks up --debug, and so --version / --help can short-circuit
@@ -358,6 +364,8 @@ static void ApplyMenuDefaults(HWND hWnd) {
   // InitWindow returns) so the latch is in place before the first
   // enable / label-swap attempt.
   s_console_menu_user_disabled = IsMenuGrayed(menu, IDM_CONSOLE);
+  // Initial sound on/off from the .rc's CHECKED flag on IDM_SOUND.
+  g_sound_on = IsMenuChecked(menu, IDM_SOUND);
 }
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -460,7 +468,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         case IDM_ABOUT:
         case IDC_ABOUT_BUTTON:
-          PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
+          if (g_sound_on) {
+            PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
+          }
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_ABOUTDLG), hWnd, AboutDlgProc);
           break;
         case IDC_START_BUTTON: {
@@ -492,9 +502,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_SOUND: {
-          // CHECKED == Souds on
-          const bool now_on = ToggleMenuCheck(hWnd, IDM_SOUND);
-          //SetSoundOn(now_on);
+          // CHECKED == Sounds on. Push into the global so picalc's
+          // completion-chime check sees the new state.
+          g_sound_on = ToggleMenuCheck(hWnd, IDM_SOUND);
           break;
         }
         case IDM_CONSOLE: {

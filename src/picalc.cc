@@ -39,6 +39,7 @@
 
 #include "constants.h"
 #include "controls.h"
+#include "resource.h"
 #include "strings.h"
 
 namespace {
@@ -413,16 +414,6 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
     return 0;
   }
 
-  // Result, iterations (= BS leaves used), and elapsed time.
-  // Format pi to decimal. With the kMaxPrintNumDigits cap, FormatPi
-  // only converts the digits we'll actually show - cheap. Without
-  // the cap, this is the second single-threaded GMP hotspot (after
-  // mpf_div above), hence the timing line.
-  EmitLine(L"Formatting result to decimal.");
-  const std::wstring outpi       = FormatPi(pi, digits, kMaxPrintNumDigits);
-  // Emit final Pi output to hOutputEdit
-  EmitLine(outpi);
-
   std::wostringstream iter_line;
   iter_line << kIterMessage << N;
   EmitLine(iter_line.str());
@@ -432,8 +423,26 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   std::wostringstream time_line;
   time_line << kTimeMessage << (elapsedMs / 1000.0) << L" seconds elapsed";
   EmitLine(time_line.str());
+  SendOutputMessage(L"Done Calculating Pi!");
+  // Result, iterations (= BS leaves used), and elapsed time.
+  // Format pi to decimal. With the kMaxPrintNumDigits cap, FormatPi
+  // only converts the digits we'll actually show - cheap. Without
+  // the cap, this is the second single-threaded GMP hotspot (after
+  // mpf_div above), hence the timing line.
+  EmitLine(L"Formatting result to decimal.");
+  const std::wstring outpi       = FormatPi(pi, digits, kMaxPrintNumDigits);
+  // Emit final Pi output to hOutputEdit
+  EmitLine(std::wstring(L"Result: ") + outpi);
 
   PrintOutputSeparator();
+
+  // Completion chime. Gated on the Settings -> Sound? menu via
+  // g_sound_on. SND_ASYNC kicks playback off on a system thread so
+  // we don't block the worker. PlaySoundW is documented thread-safe;
+  // the stop-check above ensures we don't chime on a cancelled run.
+  if (g_sound_on) {
+    PlaySoundW(MAKEINTRESOURCEW(IDR_TADA_WAV), g_hInstance, SND_RESOURCE | SND_ASYNC);
+  }
 
   g_running = false;
   return 0;

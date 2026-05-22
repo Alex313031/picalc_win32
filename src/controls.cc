@@ -98,9 +98,11 @@ bool CreateChildControls(HWND parent) {
   }
   // Bottom pane: multi-line, read-only edit. Starts hidden-size (0x0);
   // LayoutChildren places it correctly on the first WM_SIZE.
+  static constexpr DWORD dwOutput =
+      dwCHILD | WS_VSCROLL | WS_HSCROLL | ES_LEFT | ES_MULTILINE | ES_READONLY;
   hOutputEdit = CreateWindowExW(
-      WS_EX_WINDOWEDGE, L"EDIT", L"",
-      WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+      WS_EX_WINDOWEDGE, WC_EDIT, L"",
+      dwOutput | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
       0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OUTPUT_EDIT)),
       g_hInstance, nullptr);
   if (hOutputEdit == nullptr) {
@@ -108,7 +110,7 @@ bool CreateChildControls(HWND parent) {
   }
 
   hSplitter = CreateWindowExW(
-      0, kSplitterClassName, L"", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, parent,
+      0, kSplitterClassName, L"", dwCHILD, 0, 0, 0, 0, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_SPLITTER)), g_hInstance, nullptr);
   if (hSplitter == nullptr) {
     return false;
@@ -125,7 +127,7 @@ bool CreateChildControls(HWND parent) {
   const int col2_x  = kPadLeft + kButtonWidth + kHGap;
 
   hDigitsLabel = CreateWindowExW(
-      0, L"STATIC", kNumDigitsLabel, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
+      0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
       kPadLeft, row1_y, kLabelWidth, kControlHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)), g_hInstance, nullptr);
   if (hDigitsLabel == nullptr) {
@@ -133,7 +135,7 @@ bool CreateChildControls(HWND parent) {
   }
 
   hDigitsCombo = CreateWindowExW(
-      0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
+      0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
       combo_x, row1_y, kComboWidth, kComboDropHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_COMBO)), g_hInstance, nullptr);
   if (hDigitsCombo == nullptr) {
@@ -141,7 +143,7 @@ bool CreateChildControls(HWND parent) {
   }
 
   hThreadsLabel = CreateWindowExW(
-      0, L"STATIC", kNumThreadsLabel, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
+      0, WC_STATIC, kNumThreadsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
       kPadLeft, row2_y, kLabelWidth, kControlHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_LABEL)), g_hInstance, nullptr);
   if (hThreadsLabel == nullptr) {
@@ -149,7 +151,7 @@ bool CreateChildControls(HWND parent) {
   }
 
   hThreadsCombo = CreateWindowExW(
-      0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
+      0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
       combo_x, row2_y, kComboWidth, kComboDropHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_COMBO)), g_hInstance, nullptr);
   if (hThreadsCombo == nullptr) {
@@ -159,8 +161,8 @@ bool CreateChildControls(HWND parent) {
   // Row 3: Calculate + Stop buttons. BS_CENTER | BS_VCENTER spell out
   // the centering even though BS_PUSHBUTTON already centres by default.
   hStartButton = CreateWindowExW(
-      0, L"BUTTON", kStartButtonLabel,
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kStartButtonLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kPadLeft, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_START_BUTTON)), g_hInstance, nullptr);
   if (hStartButton == nullptr) {
@@ -168,8 +170,8 @@ bool CreateChildControls(HWND parent) {
   }
 
   hStopButton = CreateWindowExW(
-      0, L"BUTTON", kStopButtonLabel,
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kStopButtonLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       col2_x, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_STOP_BUTTON)), g_hInstance, nullptr);
   if (hStopButton == nullptr) {
@@ -178,8 +180,8 @@ bool CreateChildControls(HWND parent) {
 
   // Row 4: Open Out File + About buttons.
   hOpenOutButton = CreateWindowExW(
-      0, L"BUTTON", kOpenOutFileLabel,
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kOpenOutFileLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kPadLeft, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
   if (hOpenOutButton == nullptr) {
@@ -187,8 +189,8 @@ bool CreateChildControls(HWND parent) {
   }
 
   hAboutButton = CreateWindowExW(
-      0, L"BUTTON", kAboutButtonLabel,
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kAboutButtonLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       col2_x, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
   if (hAboutButton == nullptr) {
@@ -313,7 +315,7 @@ void SendOutputMessage(const std::wstring& msg) {
 }
 
 void PrintOutputSeparator() {
-  static constexpr int kSeparatorWidth = 80;
+  static constexpr int kSeparatorWidth = 90;
   SendOutputMessage(std::wstring(kSeparatorWidth, L'*'));
 }
 
