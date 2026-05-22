@@ -32,6 +32,14 @@
 /* Child control IDs */
 #define IDC_OUTPUT_EDIT             600
 #define IDC_SPLITTER                601
+#define IDC_DIGITS_LABEL            602
+#define IDC_DIGITS_COMBO            603
+#define IDC_THREADS_LABEL           604
+#define IDC_THREADS_COMBO           605
+#define IDC_START_BUTTON            606
+#define IDC_STOP_BUTTON             607
+#define IDC_OPENOUT_BUTTON          608
+#define IDC_ABOUT_BUTTON            609
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC

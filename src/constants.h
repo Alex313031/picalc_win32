@@ -30,6 +30,31 @@ inline constexpr INT CW_MINHEIGHT = 480;
 inline constexpr INT kSplitterHeight = 5;
 inline constexpr INT kMinPaneHeight  = CW_MINHEIGHT / 2;
 
+// Top-pane control layout (in pixels, relative to the parent client area).
+inline constexpr INT kPadLeft       = 14;
+inline constexpr INT kPadTop        = 14;
+inline constexpr INT kHGap          = 5;
+inline constexpr INT kVGap          = 7;
+inline constexpr INT kLabelWidth    = 100;
+inline constexpr INT kControlHeight = 21;
+inline constexpr INT kComboWidth    = 90;
+inline constexpr INT kButtonWidth   = kComboWidth;
+inline constexpr INT kButtonHeight  = 28;
+// Height passed to a combobox at create time is the *dropdown list*
+// height when open, not the always-visible field height (that's font-
+// derived). 200px gives room for ~8 options without scrolling.
+inline constexpr INT kComboDropHeight = 200;
+
+inline constexpr UINT kMinNumDigits = 1u; // Min would be 3
+inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
+
+// 10,000 max digits printable in output area, any more and it will only output
+// the full result to a text file, truncating to this in the output area.
+inline constexpr UINT kMaxPrintNumDigits = 10000;
+
+inline constexpr UINT kMinNumThreads = 1u; // Need at least 1 thread
+inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this
+
 // Child window style
 inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 

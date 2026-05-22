@@ -13,7 +13,7 @@ Because I wanted an open source version of SuperPi.
 It is multi-threaded, and designed to be hyper-compatible - it supports Windows 2000 - 11.  
 It uses the [GMP](https://gmplib.org/) library for large floating point math.
 
-<img src="./assets/Windows_2000_logo.svg" height="64"> :smile_cat:
+<img src="./assets/Windows_2000_logo.svg" height="64">
 
 ## Building
 

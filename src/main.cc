@@ -14,9 +14,17 @@
 // Globals
 // =========================================================================
 
-HWND mainHwnd    = nullptr;
-HWND hOutputEdit = nullptr;
-HWND hSplitter   = nullptr;
+HWND mainHwnd      = nullptr;
+HWND hOutputEdit   = nullptr;
+HWND hSplitter     = nullptr;
+HWND hDigitsLabel  = nullptr;
+HWND hDigitsCombo  = nullptr;
+HWND hThreadsLabel = nullptr;
+HWND hThreadsCombo = nullptr;
+HWND hStartButton   = nullptr;
+HWND hStopButton    = nullptr;
+HWND hOpenOutButton = nullptr;
+HWND hAboutButton   = nullptr;
 
 HINSTANCE g_hInstance = nullptr;
 
@@ -209,7 +217,7 @@ static void UpdateConsoleToggleMenu(HWND hWnd) {
   MENUITEMINFOW mii = {};
   mii.cbSize        = sizeof(mii);
   mii.fMask         = MIIM_STRING;
-  mii.dwTypeData    = const_cast<LPWSTR>(visible ? L"Hide Console" : L"Show Console");
+  mii.dwTypeData    = const_cast<LPWSTR>(visible ? kHideConsoleLabel : kShowConsoleLabel);
   SetMenuItemInfoW(menu, IDM_CONSOLE, FALSE, &mii);
 }
 
@@ -382,13 +390,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // brush - which is grey on classic Win2k. Force notepad-style
       // white-on-black for our output pane.
       HWND hCtrl = reinterpret_cast<HWND>(lParam);
+      HDC hdc    = reinterpret_cast<HDC>(wParam);
       if (hCtrl == hOutputEdit) {
-        HDC hdc = reinterpret_cast<HDC>(wParam);
         SetBkColor(hdc, RGB_WHITE);
         SetTextColor(hdc, RGB_BLACK);
         return reinterpret_cast<LRESULT>(GetStockObject(WHITE_BRUSH));
       }
-      return DefWindowProcW(hWnd, message, wParam, lParam);
+      // Everything else (plain STATIC labels, disabled edits, etc.) -
+      // paint with the parent's g_bkg_color so the control blends into
+      // the top pane instead of standing out at the system's
+      // COLOR_BTNFACE shade. Brush is cached the first time we need it
+      // and leaked at process exit; the OS reclaims GDI objects on
+      // termination.
+      static HBRUSH s_bkg_brush = nullptr;
+      if (s_bkg_brush == nullptr) {
+        s_bkg_brush = CreateSolidBrush(g_bkg_color);
+      }
+      SetBkColor(hdc, g_bkg_color);
+      return reinterpret_cast<LRESULT>(s_bkg_brush);
     }
     case WM_SIZE: {
       // cxClient / cyClient mirror the main window's client area in pixels.
@@ -416,6 +435,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           ShutDownApp();
           break;
         case IDM_ABOUT:
+        case IDC_ABOUT_BUTTON:
           PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_ABOUTDLG), hWnd, AboutDlgProc);
           break;

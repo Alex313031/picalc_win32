@@ -5,6 +5,7 @@
 #include "constants.h"
 #include "main.h"
 #include "resource.h"
+#include "strings.h"
 #include "utils.h"
 
 // =========================================================================
@@ -112,6 +113,108 @@ bool CreateChildControls(HWND parent) {
   if (hSplitter == nullptr) {
     return false;
   }
+
+  // Top pane: stacked rows of "label + combobox" pickers. SS_CENTERIMAGE
+  // vertically centres the label text so it aligns with the combo's
+  // text baseline.
+  const int row1_y  = kPadTop;
+  const int row2_y  = row1_y + kControlHeight + kVGap;
+  const int row3_y  = row2_y + kControlHeight + kVGap;
+  const int row4_y  = row3_y + kButtonHeight + kVGap;
+  const int combo_x = kPadLeft + kLabelWidth + kHGap;
+  const int col2_x  = kPadLeft + kButtonWidth + kHGap;
+
+  hDigitsLabel = CreateWindowExW(
+      0, L"STATIC", kNumDigitsLabel, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
+      kPadLeft, row1_y, kLabelWidth, kControlHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)), g_hInstance, nullptr);
+  if (hDigitsLabel == nullptr) {
+    return false;
+  }
+
+  hDigitsCombo = CreateWindowExW(
+      0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
+      combo_x, row1_y, kComboWidth, kComboDropHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_COMBO)), g_hInstance, nullptr);
+  if (hDigitsCombo == nullptr) {
+    return false;
+  }
+
+  hThreadsLabel = CreateWindowExW(
+      0, L"STATIC", kNumThreadsLabel, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
+      kPadLeft, row2_y, kLabelWidth, kControlHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_LABEL)), g_hInstance, nullptr);
+  if (hThreadsLabel == nullptr) {
+    return false;
+  }
+
+  hThreadsCombo = CreateWindowExW(
+      0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
+      combo_x, row2_y, kComboWidth, kComboDropHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_COMBO)), g_hInstance, nullptr);
+  if (hThreadsCombo == nullptr) {
+    return false;
+  }
+
+  // Row 3: Calculate + Stop buttons. BS_CENTER | BS_VCENTER spell out
+  // the centering even though BS_PUSHBUTTON already centres by default.
+  hStartButton = CreateWindowExW(
+      0, L"BUTTON", kStartButtonLabel,
+      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      kPadLeft, row3_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_START_BUTTON)), g_hInstance, nullptr);
+  if (hStartButton == nullptr) {
+    return false;
+  }
+
+  hStopButton = CreateWindowExW(
+      0, L"BUTTON", kStopButtonLabel,
+      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      col2_x, row3_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_STOP_BUTTON)), g_hInstance, nullptr);
+  if (hStopButton == nullptr) {
+    return false;
+  }
+
+  // Row 4: Open Out File + About buttons.
+  hOpenOutButton = CreateWindowExW(
+      0, L"BUTTON", kOpenOutFileLabel,
+      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      kPadLeft, row4_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
+  if (hOpenOutButton == nullptr) {
+    return false;
+  }
+
+  hAboutButton = CreateWindowExW(
+      0, L"BUTTON", kAboutButtonLabel,
+      WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      col2_x, row4_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
+  if (hAboutButton == nullptr) {
+    return false;
+  }
+
+  // Apply the standard GUI font to every control. Without this they
+  // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
+  // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
+  HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  const HWND kFontTargets[] = {hDigitsLabel, hDigitsCombo,   hThreadsLabel, hThreadsCombo,
+                               hStartButton, hStopButton,    hOpenOutButton, hAboutButton};
+  for (HWND hCtrl : kFontTargets) {
+    SendMessageW(hCtrl, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
+  }
+
+  for (const wchar_t* opt : kDigitOptions) {
+    SendMessageW(hDigitsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
+  }
+  for (const wchar_t* opt : kThreadsOptions) {
+    SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
+  }
+  // Default to the first entry so the combos aren't blank at startup.
+  SendMessageW(hDigitsCombo, CB_SETCURSEL, 0, 0);
+  SendMessageW(hThreadsCombo, CB_SETCURSEL, 0, 0);
+
   return true;
 }
 
@@ -134,9 +237,12 @@ void LayoutChildren(HWND parent) {
   if (cx <= 0 || cy <= 0) {
     return;
   }
-  // Default to a 50/50 split on first layout.
+  // Default to a 1/3 top, 2/3 bottom split on first layout. Computed in
+  // float so the ratio is explicit; truncated to int at the end since
+  // the splitter Y is a pixel value.
   if (s_splitter_y < 0) {
-    s_splitter_y = cy / 2;
+    static constexpr float kTopPaneFraction = 1.0f / 3.0f;
+    s_splitter_y = static_cast<int>(static_cast<float>(cy) * kTopPaneFraction);
   }
   // Clamp into a local for layout; don't write back to s_splitter_y.
   // Otherwise shrinking the window past the user's splitter Y would
