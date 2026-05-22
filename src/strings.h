@@ -7,7 +7,7 @@
 inline const wchar_t* const kCalculateMessage = L"Started Calculating ";
 inline const wchar_t* const kStoppedMessage   = L"Stopped Calculating ";
 inline const wchar_t* const kDoneMessage      = L"Done Calculating ";
-inline const wchar_t* const kIterMessage      = L"Iterations: ";
+inline const wchar_t* const kIterMessage      = L"Number of Iterations: ";
 inline const wchar_t* const kTimeMessage      = L"Time: ";
 
 // Controls strings

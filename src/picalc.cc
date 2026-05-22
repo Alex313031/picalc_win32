@@ -134,7 +134,7 @@ void NoteCombineComplete(int depth) {
     const DWORD elapsed_ms = GetTickCount() - g_calc_start_tick;
     std::wostringstream m;
     m << L"Merge level " << depth << L" of " << g_start_depth << L" done ("
-      << expected << L" combines, " << (elapsed_ms / 1000.0) << L"s elapsed)";
+      << expected << L" mpf multiply, " << (elapsed_ms / 1000.0) << L"s. elapsed)";
     EmitLine(m.str());
   }
 }
@@ -310,7 +310,7 @@ std::wstring FormatPi(const mpf_class& pi, int digits, int maxDigits) {
     formatted += raw;
   }
   if (truncated) {
-    formatted += "...";
+    formatted += "... (Open result file to see full value)";
   }
   // ASCII narrow -> wide. mpf_get_str only emits 0-9 / '-' / '.'.
   return std::wstring(formatted.begin(), formatted.end());
@@ -394,7 +394,6 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   // here is single-threaded and ~3-5x the cost of one mpf_mul on
   // huge precision; broken out with a timing line so the user knows
   // the calc is in the divide phase, not stuck.
-  EmitLine(L"Computing pi (mpf divide)...");
   const DWORD mpf_start = GetTickCount();
   const mpf_class q_f(total.Q);
   const mpf_class t_f(total.T);
@@ -402,7 +401,7 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   {
     const DWORD elapsed = GetTickCount() - mpf_start;
     std::wostringstream m;
-    m << L"  pi computed (" << (elapsed / 1000.0) << L"s)";
+    m << L"Computed final Pi (mpf divide, " << (elapsed / 1000.0) << L"s. elapsed)";
     EmitLine(m.str());
   }
 
@@ -419,16 +418,10 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   // only converts the digits we'll actually show - cheap. Without
   // the cap, this is the second single-threaded GMP hotspot (after
   // mpf_div above), hence the timing line.
-  EmitLine(L"Formatting result to decimal...");
-  const DWORD fmt_start          = GetTickCount();
-  const std::wstring formatted   = FormatPi(pi, digits, kMaxPrintNumDigits);
-  const DWORD fmt_elapsed_ms     = GetTickCount() - fmt_start;
-  {
-    std::wostringstream m;
-    m << L"  formatted (" << (fmt_elapsed_ms / 1000.0) << L"s)";
-    EmitLine(m.str());
-  }
-  EmitLine(formatted);
+  EmitLine(L"Formatting result to decimal.");
+  const std::wstring outpi       = FormatPi(pi, digits, kMaxPrintNumDigits);
+  // Emit final Pi output to hOutputEdit
+  EmitLine(outpi);
 
   std::wostringstream iter_line;
   iter_line << kIterMessage << N;
@@ -437,12 +430,9 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   const DWORD t_end     = GetTickCount();
   const DWORD elapsedMs = t_end - t_start;
   std::wostringstream time_line;
-  time_line << kTimeMessage << (elapsedMs / 1000.0) << L"seconds elapsed";
+  time_line << kTimeMessage << (elapsedMs / 1000.0) << L" seconds elapsed";
   EmitLine(time_line.str());
 
-  std::wostringstream done;
-  done << kDoneMessage << L"Pi to " << digits << L" digits.";
-  EmitLine(done.str());
   PrintOutputSeparator();
 
   g_running = false;
