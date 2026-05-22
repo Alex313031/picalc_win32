@@ -85,4 +85,7 @@ bool ConfirmExit(HWND hWnd);
 // false on failure (null hWnd, GetMonitorInfo failure, etc.).
 bool CenterWindowOnScreen(HWND hWnd, bool multimon);
 
+// Welcome message to be displayed in console
+const std::wstring GetWelcomeMessage();
+
 #endif // PICALCWIN32_UTILS_H_

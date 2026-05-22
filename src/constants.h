@@ -24,6 +24,12 @@ inline constexpr INT CW_HEIGHT = 800;
 inline constexpr INT CW_MINWIDTH  = 320;
 inline constexpr INT CW_MINHEIGHT = 480;
 
+// Splitter bar dimensions (height in px) and the minimum height either
+// pane (top controls / bottom output) is allowed to shrink to while
+// being dragged.
+inline constexpr INT kSplitterHeight = 5;
+inline constexpr INT kMinPaneHeight  = CW_MINHEIGHT / 2;
+
 // Child window style
 inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 

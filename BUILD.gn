@@ -10,6 +10,8 @@ executable("picalc_win32") {
   precompiled_source = "src/pch.cc"
   sources = [
     "src/constants.h",
+    "src/controls.cc",
+    "src/controls.h",
     "src/framework.h",
     "src/globals.h",
     "src/main.cc",

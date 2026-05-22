@@ -5,6 +5,7 @@
 
 #include "main.h"
 
+#include "controls.h"
 #include "globals.h"
 #include "resource.h"
 #include "strings.h"
@@ -13,7 +14,9 @@
 // Globals
 // =========================================================================
 
-HWND mainHwnd = nullptr;
+HWND mainHwnd    = nullptr;
+HWND hOutputEdit = nullptr;
+HWND hSplitter   = nullptr;
 
 HINSTANCE g_hInstance = nullptr;
 
@@ -94,8 +97,11 @@ bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className) {
 
 bool InitWindow(HINSTANCE hInstance, LPCWSTR className, LPCWSTR title, int iCmdShow) {
   static constexpr DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
-  static constexpr DWORD style =
-      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX;
+  // WS_CLIPCHILDREN keeps the parent's WM_PAINT from drawing through
+  // child windows (output edit + splitter), eliminating the grey
+  // flash on resize.
+  static constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
+                                 WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
 
   // Create main window
   mainHwnd = CreateWindowExW(exStyle, className, title, style, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -269,8 +275,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   if (g_show_help) {
     return ShowHelpAndExit();
   }
-  LOG(INFO) << L"---- Welcome to " << GetAppName() << L" ----";
-  LOG(INFO) << L"Version: " << GetVersionString() << (is_debug ? L" DEBUG" : L"");
+  LOG(INFO) << GetWelcomeMessage();
 
   kMainIcon  = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
   kSmallIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
@@ -330,7 +335,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         mainHwnd = hWnd; // Prevent race condition in InitApp
       }
       CenterWindowOnScreen(hWnd, /*multimon=*/true);
+      if (!RegisterSplitterClass(g_hInstance)) {
+        LOG(ERROR) << L"Failed to register splitter class!";
+        return -1;
+      }
+      if (!CreateChildControls(hWnd)) {
+        LOG(ERROR) << L"Failed to create child controls!";
+        return -1;
+      }
       InitApp(hWnd);
+      SendOutputMessage(GetWelcomeMessage());
       break;
     case WM_TIMER: {
       break;
@@ -362,6 +376,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       EndPaint(hWnd, &ps);
       break;
     }
+    case WM_CTLCOLORSTATIC: {
+      // ES_READONLY edits get coloured via WM_CTLCOLORSTATIC (not
+      // WM_CTLCOLOREDIT), and the default response is a COLOR_BTNFACE
+      // brush - which is grey on classic Win2k. Force notepad-style
+      // white-on-black for our output pane.
+      HWND hCtrl = reinterpret_cast<HWND>(lParam);
+      if (hCtrl == hOutputEdit) {
+        HDC hdc = reinterpret_cast<HDC>(wParam);
+        SetBkColor(hdc, RGB_WHITE);
+        SetTextColor(hdc, RGB_BLACK);
+        return reinterpret_cast<LRESULT>(GetStockObject(WHITE_BRUSH));
+      }
+      return DefWindowProcW(hWnd, message, wParam, lParam);
+    }
     case WM_SIZE: {
       // cxClient / cyClient mirror the main window's client area in pixels.
       cxClient = LOWORD(lParam);
@@ -373,7 +401,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       if (cyClient < 0) {
         cyClient = 0;
       }
-      // TODO: handle resize/invalidate rect
+      LayoutChildren(hWnd);
       break;
     }
     case WM_COMMAND: {

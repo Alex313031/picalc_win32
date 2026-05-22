@@ -351,3 +351,12 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
   return SetWindowPos(hWnd, nullptr, new_x, new_y, 0, 0,
                       SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
 }
+
+const std::wstring GetWelcomeMessage() {
+  std::wostringstream wostr;
+  wostr << L"---- Welcome to " << GetAppName() << L" ----" << L"\n"
+        << L"             Version: " << GetVersionString()
+        << (is_debug ? L" DEBUG" : L"");
+  const std::wstring welcome = wostr.str();
+  return welcome;
+}

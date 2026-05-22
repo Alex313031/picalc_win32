@@ -29,6 +29,10 @@
 // to res/tada.wav;
 #define IDR_TADA_WAV                500
 
+/* Child control IDs */
+#define IDC_OUTPUT_EDIT             600
+#define IDC_SPLITTER                601
+
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC
  #define IDC_STATIC                 -1
