@@ -355,7 +355,7 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
 const std::wstring GetWelcomeMessage() {
   std::wostringstream wostr;
   wostr << L"---- Welcome to " << GetAppName() << L" ----" << L"\n"
-        << L"             Version: " << GetVersionString()
+        << L"       Version: " << GetVersionString()
         << (is_debug ? L" DEBUG" : L"");
   const std::wstring welcome = wostr.str();
   return welcome;

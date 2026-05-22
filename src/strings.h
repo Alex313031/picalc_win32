@@ -23,7 +23,7 @@ inline const wchar_t* const kAboutButtonLabel = L"About";
 // Combobox items: Order = display order.
 inline const wchar_t* const kDigitOptions[] = {
   // Digit-count options offered in the num digitscombobox.
-  L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"Custom"
+  L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"Custom"
 };
 
 inline const wchar_t* const kThreadsOptions[] = {

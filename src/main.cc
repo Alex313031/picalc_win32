@@ -439,8 +439,26 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_ABOUTDLG), hWnd, AboutDlgProc);
           break;
+        case IDC_START_BUTTON: {
+          const int digits  = GetSelectedDigits();
+          const int threads = GetSelectedThreads();
+          if (digits < 0 || threads < 0) {
+            SendOutputMessage(L"Custom selection is not yet supported.");
+            break;
+          }
+          if (!StartCalculation(digits, threads)) {
+            SendOutputMessage(L"Could not start (already running?).");
+          }
+          break;
+        }
+        case IDC_STOP_BUTTON:
+          StopCalculation();
+          break;
         case IDM_HELP:
           LaunchHelp(hWnd);
+          break;
+        case IDM_CLEAROUTPUT:
+          ClearOutput();
           break;
         case IDM_SAVEAS: {
           std::wstring savepath;

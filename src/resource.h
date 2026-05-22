@@ -21,6 +21,7 @@
 #define IDM_CEXIT                   202
 #define IDM_HELP                    203
 #define IDM_SAVEAS                  204
+#define IDM_CLEAROUTPUT             205
 
 #define IDM_SOUND                   250
 #define IDM_CONSOLE                 251

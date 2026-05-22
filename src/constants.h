@@ -48,9 +48,9 @@ inline constexpr INT kComboDropHeight = 200;
 inline constexpr UINT kMinNumDigits = 1u; // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 
-// 10,000 max digits printable in output area, any more and it will only output
+// 100 max digits printable in output area, any more and it will only output
 // the full result to a text file, truncating to this in the output area.
-inline constexpr UINT kMaxPrintNumDigits = 10000;
+inline constexpr UINT kMaxPrintNumDigits = 100;
 
 inline constexpr UINT kMinNumThreads = 1u; // Need at least 1 thread
 inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this

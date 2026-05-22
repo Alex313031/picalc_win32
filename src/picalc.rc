@@ -65,6 +65,8 @@ IDR_MAIN MENU
 BEGIN
     POPUP "&File"
     BEGIN
+        MENUITEM "&Clear Output",     IDM_CLEAROUTPUT
+        MENUITEM SEPARATOR
         MENUITEM "&Save Screenshot",  IDM_SAVEAS
         MENUITEM SEPARATOR
         MENUITEM "E&xit",       IDM_EXIT

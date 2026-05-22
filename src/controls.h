@@ -34,4 +34,18 @@ void SetSplitterY(int y);
 // newest line visible. No-op if the output edit isn't created yet.
 void SendOutputMessage(const std::wstring& msg);
 
+// Appends a visual separator (80 asterisks) to the output edit only.
+// Used to break up sections of the log without spamming the console.
+void PrintOutputSeparator();
+
+// Wipes the output edit. No-op if the control hasn't been created yet.
+void ClearOutput();
+
+// Reads the current selection from the digits / threads combos and
+// converts the displayed string ("1K", "1,000", "10M", "32") to an
+// integer. Returns -1 when "Custom" is selected, the combo has no
+// selection, or the value can't be parsed.
+int GetSelectedDigits();
+int GetSelectedThreads();
+
 #endif // PICALCWIN32_CONTROLS_H_

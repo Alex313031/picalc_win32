@@ -118,8 +118,8 @@ bool CreateChildControls(HWND parent) {
   // vertically centres the label text so it aligns with the combo's
   // text baseline.
   const int row1_y  = kPadTop;
-  const int row2_y  = row1_y + kControlHeight + kVGap;
-  const int row3_y  = row2_y + kControlHeight + kVGap;
+  const int row2_y  = row1_y + kControlHeight + kPadTop;
+  const int row3_y  = row2_y + kControlHeight + kPadTop;
   const int row4_y  = row3_y + kButtonHeight + kVGap;
   const int combo_x = kPadLeft + kLabelWidth + kHGap;
   const int col2_x  = kPadLeft + kButtonWidth + kHGap;
@@ -310,4 +310,71 @@ void SendOutputMessage(const std::wstring& msg) {
   // text into view, but EM_SCROLLCARET makes the guarantee explicit
   // when the user has scrolled up to read earlier output.
   SendMessageW(hOutputEdit, EM_SCROLLCARET, 0, 0);
+}
+
+void PrintOutputSeparator() {
+  static constexpr int kSeparatorWidth = 80;
+  SendOutputMessage(std::wstring(kSeparatorWidth, L'*'));
+}
+
+void ClearOutput() {
+  if (hOutputEdit == nullptr) {
+    return;
+  }
+  // WM_SETTEXT with an empty string clears the entire buffer in one
+  // shot - cheaper than EM_SETSEL+EM_REPLACESEL for a wipe. Reprint
+  // the welcome banner so the edit lands in the same state as it
+  // was at startup (WM_CREATE).
+  SetWindowTextW(hOutputEdit, L"");
+  SendOutputMessage(GetWelcomeMessage());
+}
+
+// "10", "1K", "10M", "1,000" -> integer. Commas are skipped; a
+// trailing K / M suffix multiplies by 1e3 / 1e6 respectively.
+// "Custom" -> -1 (caller should treat as "user input not yet wired").
+static int ParseCountSuffixed(const std::wstring& s) {
+  if (s == L"Custom") {
+    return -1;
+  }
+  long val = 0;
+  wchar_t suf = 0;
+  for (wchar_t c : s) {
+    if (c >= L'0' && c <= L'9') {
+      val = val * 10 + (c - L'0');
+    } else if (c == L',') {
+      // skip thousands separators
+    } else {
+      suf = c;
+      break;
+    }
+  }
+  if (suf == L'K' || suf == L'k') {
+    val *= 1000;
+  } else if (suf == L'M' || suf == L'm') {
+    val *= 1000000;
+  }
+  return static_cast<int>(val);
+}
+
+static int GetSelectedFromCombo(HWND hCombo) {
+  if (hCombo == nullptr) {
+    return -1;
+  }
+  const LRESULT idx = SendMessageW(hCombo, CB_GETCURSEL, 0, 0);
+  if (idx == CB_ERR) {
+    return -1;
+  }
+  wchar_t buf[64] = {0};
+  if (SendMessageW(hCombo, CB_GETLBTEXT, idx, reinterpret_cast<LPARAM>(buf)) == CB_ERR) {
+    return -1;
+  }
+  return ParseCountSuffixed(buf);
+}
+
+int GetSelectedDigits() {
+  return GetSelectedFromCombo(hDigitsCombo);
+}
+
+int GetSelectedThreads() {
+  return GetSelectedFromCombo(hThreadsCombo);
 }
