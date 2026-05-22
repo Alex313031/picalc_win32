@@ -60,8 +60,9 @@ static bool s_console_menu_user_disabled = false;
 // returns a permanently-hidden pseudo-window owned by conhost.exe - the
 // visible Terminal UI is a separate process. So IsWindowVisible says
 // "hidden" even though the user can see the console fine. Track intent
-// instead: starts false (we only attach a console when --debug, and the
-// attach intends it to be visible), flips on every successful toggle.
+// instead: wWinMain hides the console immediately at startup unless
+// --debug / --version / --help asked for it visible, and the flag flips
+// on every successful Show/HideConsole call after that.
 static bool s_console_hidden = false;
 
 // Whether window was minimized or not
@@ -272,7 +273,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   const bool open_console = g_debug_mode || g_show_version || g_show_help;
   const logging::LogDest kLogSink =
       open_console ? g_debug_mode ? logging::LOG_TO_ALL : logging::LOG_TO_STDERR
-                   : logging::LOG_NONE;
+                   : logging::LOG_TO_STDERR;
   static const std::wstring file_name = std::wstring(INTERNAL_NAME);
   const std::wstring kLogFile         = file_name + L".log";
   logging::LogInitSettings LoggingSettings;
@@ -288,6 +289,18 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 3;
   }
   logging::SetIsDCheck(is_dcheck);
+  // We always attach a console (so the Dev -> Console menu is useful
+  // even in release builds), but unless we're in a mode that actually
+  // wants it visible right now - --debug for live logging, --version
+  // or --help for one-shot output before exit - hide it immediately
+  // so a normal launch doesn't pop a console window the user didn't
+  // ask for. Logs still flow to the hidden stream; "Show Console"
+  // reveals it any time.
+  if (!g_debug_mode && !g_show_version && !g_show_help) {
+    if (logging::HideConsole()) {
+      s_console_hidden = true;
+    }
+  }
   if (g_show_version) {
     return ShowVersionAndExit();
   }
@@ -309,9 +322,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   if (!InitWindow(g_hInstance, szClassName, appTitle, iCmdShow)) {
     return 4;
   }
-  // Grey the Dev -> Toggle Console item when InitLogging left us without
-  // a console (i.e. no --debug). When a console is attached the item is
-  // enabled and clicking it flips visibility.
+  // Sync the Dev -> Console menu label to the current state. Console
+  // is always attached now, so the only thing this does in practice
+  // is flip the label between "Show Console" and "Hide Console"
+  // based on s_console_hidden (set by the startup auto-hide above).
   UpdateConsoleToggleMenu(mainHwnd);
 
   HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDR_MAIN));
