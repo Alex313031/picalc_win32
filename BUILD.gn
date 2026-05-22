@@ -1,0 +1,48 @@
+# Copyright 2026 Alex313031
+
+executable("picalc") {
+  configs += [
+    ":picalc_config",
+    "./src/logging:pilogger_config",
+    "//src/gmp-ninja:gmp_public_config",
+  ]
+  precompiled_header = "src/framework.h"
+  precompiled_source = "src/pch.cc"
+  sources = [
+    "src/constants.h",
+    "src/framework.h",
+    "src/globals.h",
+    "src/main.cc",
+    "src/main.h",
+    "src/picalc.rc",
+    "src/resource.h",
+    "src/strings.h",
+    "src/utils.cc",
+    "src/utils.h",
+    "src/version.h",
+  ]
+  public_deps = [
+    "//src/gmp-ninja:gmp_static",
+  ]
+  deps = [
+    "src/logging:pilogger",
+    "//src/gmp-ninja:libgmpxx_static",
+  ]
+}
+
+config("picalc_config") {
+  defines = []
+  cflags = []
+  include_dirs = [ "./src", ]
+  cflags += [
+    "-Wunused-function",
+  ]
+  libs = [
+    "kernel32",
+    "user32",
+    "shell32",
+    "comctl32",
+    "comdlg32",
+    "gdi32",
+  ]
+}
