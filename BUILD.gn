@@ -1,8 +1,8 @@
 # Copyright 2026 Alex313031
 
-executable("picalc") {
+executable("picalc_win32") {
   configs += [
-    ":picalc_config",
+    ":picalc_win32_config",
     "./src/logging:pilogger_config",
     "//src/gmp-ninja:gmp_public_config",
   ]
@@ -30,9 +30,10 @@ executable("picalc") {
     "src/logging:pilogger",
     "//src/gmp-ninja:libgmpxx_static",
   ]
+  output_name = "picalc"
 }
 
-config("picalc_config") {
+config("picalc_win32_config") {
   defines = []
   cflags = []
   include_dirs = [ "./src", ]
@@ -46,5 +47,6 @@ config("picalc_config") {
     "comctl32",
     "comdlg32",
     "gdi32",
+    "winmm",
   ]
 }

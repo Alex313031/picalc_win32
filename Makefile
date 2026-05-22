@@ -9,7 +9,7 @@ GENDEF   := gendef
 RC       := i686-w64-mingw32-windres
 
 # Targets
-NAME     := picalc
+NAME     := picalc_win32
 TARGET   := picalc.exe
 
 # Build type: choose Debug or Release
