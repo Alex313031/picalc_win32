@@ -91,4 +91,37 @@ const std::wstring GetWelcomeMessage();
 // Plays a given .wav resource ID.
 bool PlayWav(UINT resid);
 
+// =========================================================================
+// Result file (GetExeDir() + kResultsFile, UTF-16 LE)
+// =========================================================================
+
+// Creates or truncates the result file and writes a UTF-16 LE BOM.
+// Must be called before any AppendToResultFile calls.
+bool OpenResultFile();
+
+// Appends `char_count` wide characters from `data` directly to the file.
+// No newline is added - the caller controls formatting. Returns false if
+// the file is not open or the write fails. FILE_ATTRIBUTE_NORMAL (no
+// write-through) is used so the OS can buffer large sequential writes;
+// call CloseResultFile() (or FlushResultFile()) to force a flush to disk.
+bool AppendToResultFile(const wchar_t* data, size_t char_count);
+
+// Convenience overload for std::wstring.
+bool AppendToResultFile(const std::wstring& text);
+
+// Truncates the file back to just the UTF-16 LE BOM.
+bool ClearResultFile();
+
+// Flushes any buffered writes to disk without closing.
+bool FlushResultFile();
+
+// Flushes and closes the result file handle. Safe to call if already closed.
+void CloseResultFile();
+
+// Returns true if the result file handle is currently open.
+bool IsResultFileOpen();
+
+// Opens the result file in the system default viewer via ShellExecuteW.
+bool ShellOpenResultFile(HWND hWnd);
+
 #endif // PICALCWIN32_UTILS_H_

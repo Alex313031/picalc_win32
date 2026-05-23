@@ -493,6 +493,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           break;
         }
+        case IDC_OPENOUT_BUTTON:
+          if (!ShellOpenResultFile(hWnd)) {
+            ErrorBox(hWnd, L"Open File Error", L"Failed to open result file.");
+          }
+          break;
         case IDC_STOP_BUTTON:
           if (!g_running) {
             EmitLine(L"No Pi threads running", false);
@@ -581,9 +586,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     case WM_NCDESTROY:
       mainHwnd = nullptr;
-      // Last message this window will receive. Close the log file /
-      // console cleanly here, before the message loop sees the WM_QUIT
-      // that WM_DESTROY's PostQuitMessage queued.
+      // Last message this window will receive. Close the result file, log
+      // file, and console cleanly here, before the message loop sees the
+      // WM_QUIT that WM_DESTROY's PostQuitMessage queued.
+      CloseResultFile();
       logging::DeInitLogging(g_hInstance);
       break;
     default:
@@ -599,6 +605,9 @@ bool InitApp(HWND hWnd) {
   // Pull defaults from the menu's CHECKED state first,
   // so they need the final values by the time they run.
   ApplyMenuDefaults(hWnd);
+  if (!OpenResultFile()) {
+    LOG(ERROR) << L"Failed to open result file: " << (GetExeDir() + kResultsFile);
+  }
   return true;
 }
 

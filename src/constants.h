@@ -52,6 +52,9 @@ inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 // the full result to a text file, truncating to this in the output area.
 inline constexpr UINT kMaxPrintNumDigits = 32;
 
+// Output file name, written side-by-side with the .exe.
+inline constexpr wchar_t kResultsFile[] = L"picalc_result.txt";
+
 inline constexpr UINT kMinNumThreads = 1u; // Need at least 1 thread
 inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this
 

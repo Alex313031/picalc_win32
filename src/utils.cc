@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#include <shellapi.h>
 #include <shlwapi.h>
 
 #include "globals.h"
@@ -468,6 +469,100 @@ const std::wstring GetWelcomeMessage() {
         << (is_debug ? L" DEBUG" : L"");
   const std::wstring welcome = wostr.str();
   return welcome;
+}
+
+// =========================================================================
+// Result file
+// =========================================================================
+
+static HANDLE g_result_file = INVALID_HANDLE_VALUE;
+
+bool OpenResultFile() {
+  if (g_result_file != INVALID_HANDLE_VALUE) {
+    CloseResultFile();
+  }
+  const std::wstring path = GetExeDir() + kResultsFile;
+  if (path.length() >= MAX_PATH) {
+    return false;
+  }
+  // CREATE_ALWAYS: create new or truncate existing. FILE_ATTRIBUTE_NORMAL
+  // (no FILE_FLAG_WRITE_THROUGH) lets the OS buffer writes in the page
+  // cache - critical for sequential million-digit output where per-write
+  // kernel flushes would dominate wall time.
+  g_result_file = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
+                              FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (g_result_file == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  // Write UTF-16 LE BOM (FF FE).
+  static const WORD kBOM = 0xFEFF;
+  DWORD written          = 0;
+  if (!WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr)) {
+    CloseResultFile();
+    return false;
+  }
+  return true;
+}
+
+bool AppendToResultFile(const wchar_t* data, size_t char_count) {
+  if (g_result_file == INVALID_HANDLE_VALUE || data == nullptr || char_count == 0) {
+    return false;
+  }
+  const DWORD byte_count = static_cast<DWORD>(char_count * sizeof(wchar_t));
+  DWORD written          = 0;
+  return WriteFile(g_result_file, data, byte_count, &written, nullptr) &&
+         written == byte_count;
+}
+
+bool AppendToResultFile(const std::wstring& text) {
+  return AppendToResultFile(text.c_str(), text.size());
+}
+
+bool ClearResultFile() {
+  if (g_result_file == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  FlushFileBuffers(g_result_file);
+  if (SetFilePointer(g_result_file, 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER &&
+      GetLastError() != NO_ERROR) {
+    return false;
+  }
+  if (!SetEndOfFile(g_result_file)) {
+    return false;
+  }
+  // Re-write BOM after truncation so the file stays valid UTF-16.
+  static const WORD kBOM = 0xFEFF;
+  DWORD written          = 0;
+  return WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr);
+}
+
+bool FlushResultFile() {
+  if (g_result_file == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  return FlushFileBuffers(g_result_file) != FALSE;
+}
+
+void CloseResultFile() {
+  if (g_result_file == INVALID_HANDLE_VALUE) {
+    return;
+  }
+  FlushFileBuffers(g_result_file);
+  CloseHandle(g_result_file);
+  g_result_file = INVALID_HANDLE_VALUE;
+}
+
+bool IsResultFileOpen() {
+  return g_result_file != INVALID_HANDLE_VALUE;
+}
+
+bool ShellOpenResultFile(HWND hWnd) {
+  const std::wstring path = GetExeDir() + kResultsFile;
+  const HINSTANCE res =
+      ShellExecuteW(hWnd, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+  // ShellExecuteW returns a value > 32 on success.
+  return reinterpret_cast<INT_PTR>(res) > 32;
 }
 
 // One shot play of embedded .wav file

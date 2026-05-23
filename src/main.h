@@ -5,9 +5,6 @@
 #include "picalc.h"
 #include "utils.h"
 
-// File name for Pi calculation results dump
-static inline const wchar_t kResultsFile[] = L"picalc_result.txt";
-
 // Registers our window class, one of the first things to run.
 bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className);
 
