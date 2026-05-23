@@ -41,6 +41,7 @@ volatile bool g_running = false;
 // CHECKED flag (true); ApplyMenuDefaults latches the .rc state into it
 // at startup and the IDM_SOUND handler keeps it in sync on toggle.
 bool g_sound_on = true;
+bool g_colored_output = false;
 
 bool g_debug_mode = is_debug;
 // CLI flags. Set by ParseCommandLine before InitLogging runs so the log
@@ -129,7 +130,7 @@ bool InitWindow(HINSTANCE hInstance, LPCWSTR className, LPCWSTR title, int iCmdS
   // child windows (output edit + splitter), eliminating the grey
   // flash on resize.
   static constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
-                                 WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
+                                 WS_MAXIMIZEBOX | WS_SIZEBOX;
 
   // Create main window
   mainHwnd = CreateWindowExW(exStyle, className, title, style, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -389,6 +390,8 @@ static void ApplyMenuDefaults(HWND hWnd) {
   s_console_menu_user_disabled = IsMenuGrayed(menu, IDM_CONSOLE);
   // Initial sound on/off from the .rc's CHECKED flag on IDM_SOUND.
   g_sound_on = IsMenuChecked(menu, IDM_SOUND);
+  // Initial colored-output state from the .rc's CHECKED flag on IDM_COLOREDOUTPUT.
+  g_colored_output = IsMenuChecked(menu, IDM_COLOREDOUTPUT);
 }
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -412,11 +415,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_TIMER: {
       break;
     }
-    case WM_ERASEBKGND:
-      // Returning TRUE tells Windows we have handled background erasing
-      // ourselves, suppressing the default white fill. We do our own filling
-      // in WM_PAINT so the two operations don't race or double-paint.
+    case WM_ERASEBKGND: {
+      // Fill only the top pane (above the splitter) so the parent never
+      // paints over the output edit below. Without WS_CLIPCHILDREN the
+      // parent DC is not clipped, so we restrict manually.
+      // This also satisfies DrawThemeParentBackground calls from the
+      // groupbox: it forwards WM_ERASEBKGND with the child's own HDC,
+      // which is already clipped to the groupbox rect, so FillRect lands
+      // exactly where the groupbox background needs it.
+      HDC hdc = reinterpret_cast<HDC>(wParam);
+      RECT rc;
+      GetClientRect(hWnd, &rc);
+      const int spl = GetSplitterY();
+      if (spl > 0) {
+        rc.bottom = spl;
+      }
+      FillRectWithColor(hdc, rc, g_bkg_color);
       return TRUE;
+    }
     case WM_GETMINMAXINFO: {
       LPMINMAXINFO pMinMaxInfo = reinterpret_cast<LPMINMAXINFO>(lParam);
       ;
@@ -429,24 +445,32 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     }
     case WM_PAINT: {
-      // WM_ERASEBKGND returned TRUE so Windows skipped its bg fill; we own
-      // the entire client rect and paint it ourselves in one solid color.
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
-      RECT client;
-      GetClientRect(hWnd, &client);
-      FillRectWithColor(hdc, client, g_bkg_color);
+      RECT rc;
+      GetClientRect(hWnd, &rc);
+      const int spl = GetSplitterY();
+      if (spl > 0) {
+        rc.bottom = spl;
+      }
+      FillRectWithColor(hdc, rc, g_bkg_color);
       EndPaint(hWnd, &ps);
       break;
     }
     case WM_CTLCOLORSTATIC: {
       // ES_READONLY edits get coloured via WM_CTLCOLORSTATIC (not
       // WM_CTLCOLOREDIT), and the default response is a COLOR_BTNFACE
-      // brush - which is grey on classic Win2k. Force notepad-style
-      // white-on-black for our output pane.
+      // brush - which is grey on classic Win2k. Use white-on-black
+      // normally, or black-on-green (CRT style) when g_colored_output.
       HWND hCtrl = reinterpret_cast<HWND>(lParam);
       HDC hdc    = reinterpret_cast<HDC>(wParam);
       if (hCtrl == hOutputEdit) {
+        if (g_colored_output) {
+          static HBRUSH s_crt_brush = CreateSolidBrush(RGB_BLACK);
+          SetBkColor(hdc, RGB_BLACK);
+          SetTextColor(hdc, RGB_GREEN);
+          return reinterpret_cast<LRESULT>(s_crt_brush);
+        }
         SetBkColor(hdc, RGB_WHITE);
         SetTextColor(hdc, RGB_BLACK);
         return reinterpret_cast<LRESULT>(GetStockObject(WHITE_BRUSH));
@@ -559,6 +583,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // CHECKED == Sounds on. Push into the global so picalc's
           // completion-chime check sees the new state.
           g_sound_on = ToggleMenuCheck(hWnd, IDM_SOUND);
+          break;
+        }
+        case IDM_COLOREDOUTPUT: {
+          g_colored_output = ToggleMenuCheck(hWnd, IDM_COLOREDOUTPUT);
+          // Force the output edit to repaint immediately with the new colours.
+          if (hOutputEdit != nullptr) {
+            InvalidateRect(hOutputEdit, nullptr, TRUE);
+          }
           break;
         }
         case IDM_CONSOLE: {

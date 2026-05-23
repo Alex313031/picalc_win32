@@ -76,7 +76,8 @@ BEGIN
     END
     POPUP "&Settings"
     BEGIN
-        MENUITEM "S&ound?",  IDM_SOUND, CHECKED
+        MENUITEM "S&ound?",              IDM_SOUND, CHECKED
+        MENUITEM "Colored Output &Pane", IDM_COLOREDOUTPUT
     END
     POPUP "&Dev"
     BEGIN

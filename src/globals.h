@@ -28,7 +28,8 @@ extern HWND hExitButton;     // "Exit" button
 
 extern volatile bool g_running;  // True while a pi calculation is in progress
 
-extern bool g_sound_on; // Mirrors the Settings -> Sound? menu check state
+extern bool g_sound_on;        // Mirrors the Settings -> Sound? menu check state
+extern bool g_colored_output;  // Mirrors the Settings -> Colored Output Pane check state
 
 extern bool can_use_582_controls; // Whether we can use "modern" common controls from XP+
 

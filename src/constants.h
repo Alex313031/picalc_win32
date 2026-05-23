@@ -8,7 +8,6 @@
 #define RGB_WHITE   RGB(255, 255, 255)
 #define RGB_GREY    RGB(128, 128, 128)
 #define RGB_DKGREY  RGB(64, 64, 64)
-#define RGB_LTGREY  RGB(192, 192, 192) // Classic Win9x/2000 button-face grey
 #define RGB_RED     RGB(255, 0, 0)
 #define RGB_GREEN   RGB(0, 255, 0)
 #define RGB_BLUE    RGB(0, 0, 255)
@@ -27,10 +26,14 @@ inline constexpr INT CW_MINHEIGHT = 480;
 // Splitter bar dimensions (height in px) and the minimum height either
 // pane (top controls / bottom output) is allowed to shrink to while
 // being dragged.
-inline constexpr INT kSplitterHeight = 5;
-inline constexpr INT kMinPaneHeight  = CW_MINHEIGHT / 2;
+inline constexpr INT     kSplitterHeight      = 10;
+inline constexpr INT     kSplitterHandleWidth = 14;
+inline constexpr INT     kSplitterHandleHeight = 1;
+inline constexpr COLORREF kSplitterHandleColor = RGB_GREY;
+inline constexpr INT     kMinPaneHeight       = CW_MINHEIGHT / 2;
 
 // Top-pane control layout (in pixels, relative to the parent client area).
+inline constexpr INT kGroupMargin   = 7;
 inline constexpr INT kPadLeft       = 14;
 inline constexpr INT kPadTop        = 14;
 inline constexpr INT kHGap          = 5;

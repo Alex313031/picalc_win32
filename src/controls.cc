@@ -1,4 +1,4 @@
-// Controls layout/logic
+// Controls creation/management and layout/logic
 
 #include "controls.h"
 
@@ -17,6 +17,10 @@ static const wchar_t* kSplitterClassName = L"PicalcSplitter";
 // -1 = uninitialised, gets centred on the first LayoutChildren call.
 static int s_splitter_y = -1;
 static bool s_dragging  = false;
+
+// Group box that frames the top-pane controls. Sized in LayoutChildren
+// since its bottom edge tracks the splitter position.
+static HWND s_hGroupBox = nullptr;
 
 static LRESULT CALLBACK SplitterProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
@@ -62,8 +66,16 @@ static LRESULT CALLBACK SplitterProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
       // Classic button-face fill with a 1px raised top + bottom edge so
       // the bar is visible against the surrounding grey without looking
       // like a heavyweight 3D bevel.
-      FillRectWithColor(hdc, rc, RGB_LTGREY);
+      FillRectWithColor(hdc, rc, g_bkg_color);
       DrawEdge(hdc, &rc, EDGE_RAISED, BF_TOP | BF_BOTTOM);
+      // Grab handle: 1px tall, 6px wide, centered in the bar.
+      const int cx      = rc.right - rc.left;
+      const int cy      = rc.bottom - rc.top;
+      const int hndl_x  = rc.left + (cx - kSplitterHandleWidth) / 2;
+      const int hndl_y  = rc.top  + (cy - kSplitterHandleHeight) / 2;
+      const RECT handle = {hndl_x, hndl_y,
+                           hndl_x + kSplitterHandleWidth, hndl_y + kSplitterHandleHeight};
+      FillRectWithColor(hdc, handle, kSplitterHandleColor);
       EndPaint(hWnd, &ps);
       return 0;
     }
@@ -116,16 +128,33 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
+  // Group box: created before the inner controls so it sits behind them
+  // in Z-order. Position is 0,0,0,0 here; LayoutChildren sizes it to
+  // fill the top pane with a 7px margin on all sides.
+  s_hGroupBox = CreateWindowExW(
+      0, WC_BUTTON, kCntrlsGroupLabel, dwCHILD | BS_GROUPBOX | WS_CLIPSIBLINGS,
+      0, 0, 0, 0, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONTROLS_GROUP)), g_hInstance, nullptr);
+  if (s_hGroupBox == nullptr) {
+    return false;
+  }
+
   // Top pane: stacked rows of "label + combobox" pickers. SS_CENTERIMAGE
   // vertically centres the label text so it aligns with the combo's
   // text baseline.
-  const int row1_y  = kPadTop;
+  const int row1_y  = kPadTop + kGroupMargin;
   const int row2_y  = row1_y + kControlHeight + kPadTop;
   const int row3_y  = row2_y + kControlHeight + kPadTop;
   const int row4_y  = row3_y + kButtonHeight + kVGap;
   const int row5_y  = row4_y + kButtonHeight + kVGap;
   const int combo_x = kPadLeft + kLabelWidth + kHGap;
-  const int col2_x  = kPadLeft + kButtonWidth + kHGap;
+  // Centre the two-button rows within the groupbox. The label+combo rows
+  // are already centred by construction (kPadLeft was chosen symmetrically).
+  constexpr int kGroupW       = kPadLeft + kLabelWidth + kHGap + kComboWidth;
+  constexpr int kGroupCenterX = kGroupMargin + kGroupW / 2;
+  constexpr int kBtnRowW      = kButtonWidth * 2 + kHGap;
+  constexpr int kBtnLeft      = kGroupCenterX - kBtnRowW / 2;
+  constexpr int col2_x        = kBtnLeft + kButtonWidth + kHGap;
 
   hDigitsLabel = CreateWindowExW(
       0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
@@ -164,7 +193,7 @@ bool CreateChildControls(HWND parent) {
   hStartButton = CreateWindowExW(
       0, WC_BUTTON, kStartButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER | BS_DEFPUSHBUTTON,
-      kPadLeft, row3_y, kButtonWidth, kButtonHeight, parent,
+      kBtnLeft, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_START_BUTTON)), g_hInstance, nullptr);
   if (hStartButton == nullptr) {
     return false;
@@ -183,7 +212,7 @@ bool CreateChildControls(HWND parent) {
   hOpenOutButton = CreateWindowExW(
       0, WC_BUTTON, kOpenOutFileLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kPadLeft, row4_y, kButtonWidth, kButtonHeight, parent,
+      kBtnLeft, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
   if (hOpenOutButton == nullptr) {
     return false;
@@ -202,7 +231,7 @@ bool CreateChildControls(HWND parent) {
   hAboutButton = CreateWindowExW(
       0, WC_BUTTON, kAboutButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kPadLeft, row5_y, kButtonWidth, kButtonHeight, parent,
+      kBtnLeft, row5_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
   if (hAboutButton == nullptr) {
     return false;
@@ -221,9 +250,9 @@ bool CreateChildControls(HWND parent) {
   // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
   // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
   HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-  const HWND kFontTargets[] = {hDigitsLabel,    hDigitsCombo,  hThreadsLabel,  hThreadsCombo,
-                               hStartButton,    hStopButton,   hOpenOutButton, hAboutButton,
-                               hConsoleButton,  hExitButton};
+  const HWND kFontTargets[] = {s_hGroupBox,     hDigitsLabel,  hDigitsCombo,   hThreadsLabel,
+                               hThreadsCombo,   hStartButton,  hStopButton,    hOpenOutButton,
+                               hAboutButton,    hConsoleButton, hExitButton};
   for (HWND hCtrl : kFontTargets) {
     SendMessageW(hCtrl, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
   }
@@ -250,7 +279,8 @@ void SetSplitterY(int y) {
 }
 
 void LayoutChildren(HWND parent) {
-  if (parent == nullptr || hSplitter == nullptr || hOutputEdit == nullptr) {
+  if (parent == nullptr || hSplitter == nullptr || hOutputEdit == nullptr ||
+      s_hGroupBox == nullptr) {
     return;
   }
   RECT rc;
@@ -287,10 +317,42 @@ void LayoutChildren(HWND parent) {
   const int bottom_top = splitter_top + kSplitterHeight;
   const int bottom_h   = (cy > bottom_top) ? (cy - bottom_top) : 0;
 
-  // Top pane is empty for now - the parent's WM_PAINT fills the
-  // strip above the splitter with g_bkg_color.
-  MoveWindow(hSplitter, 0, splitter_top, cx, kSplitterHeight, TRUE);
-  MoveWindow(hOutputEdit, 0, bottom_top, cx, bottom_h, TRUE);
+  // Group box: 7px margin on left/top/bottom. Right edge is 7px past the
+  // widest controls (label + combo row) so the right side of the client
+  // area stays free for future additions (e.g. system monitor widgets).
+  constexpr int kControlsRight = kPadLeft + kLabelWidth + kHGap + kComboWidth;
+  const int group_w = kControlsRight + kGroupMargin;
+  const int group_h = splitter_top - kGroupMargin;
+
+  // Batch all moves atomically via DeferWindowPos so the children
+  // reposition in a single pass - no intermediate state is painted,
+  // eliminating the flicker that sequential MoveWindow calls produce
+  // during live resize.
+  HDWP hdwp = BeginDeferWindowPos(3);
+  if (hdwp != nullptr) {
+    hdwp = DeferWindowPos(hdwp, s_hGroupBox, nullptr,
+                          kGroupMargin, 0, group_w, group_h,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+  if (hdwp != nullptr) {
+    hdwp = DeferWindowPos(hdwp, hSplitter, nullptr,
+                          0, splitter_top, cx, kSplitterHeight,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+  if (hdwp != nullptr) {
+    hdwp = DeferWindowPos(hdwp, hOutputEdit, nullptr,
+                          0, bottom_top, cx, bottom_h,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+  if (hdwp != nullptr) {
+    EndDeferWindowPos(hdwp);
+  }
+  // Splitter drags only call LayoutChildren — no WM_SIZE fires, so the
+  // system won't trigger a parent repaint automatically. Invalidate here
+  // so the parent erases the old groupbox border before the groupbox
+  // repaints at its new size. Without WS_CLIPCHILDREN the parent can
+  // now reach the groupbox area, making this effective.
+  InvalidateRect(parent, nullptr, TRUE);
 }
 
 // Pre-Vista Edit controls only treat \r\n as a line break - bare \n

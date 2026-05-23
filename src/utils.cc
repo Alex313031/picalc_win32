@@ -1,3 +1,5 @@
+// Common utility functions
+
 #include "utils.h"
 
 #include <shellapi.h>

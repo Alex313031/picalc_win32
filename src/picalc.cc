@@ -33,7 +33,6 @@
 
 #include <atomic>
 #include <sstream>
-#include <vector>
 
 #include <logging.h>
 
@@ -325,7 +324,17 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   PrintOutputSeparator();
   WriteSeparatorToResultFile();
 
-  // Banner: "Started Calculating N digits (Threads: T)".
+  // Timestamp line, then banner: "Started Calculating N digits (Threads: T)".
+  SYSTEMTIME st;
+  GetLocalTime(&st);
+  const WORD   h12  = (st.wHour % 12 == 0) ? 12 : st.wHour % 12;
+  const wchar_t* ampm = (st.wHour < 12) ? L"AM" : L"PM";
+  wchar_t ts[32];
+  swprintf(ts, 32, L"%02u/%02u/%02u %02u:%02u:%02u %s",
+           st.wMonth, st.wDay, st.wYear % 100,
+           h12, st.wMinute, st.wSecond, ampm);
+  EmitLine(ts, false);
+  WriteLineToResultFile(ts);
   std::wostringstream banner;
   banner << kCalculateMessage << digits << L" digits (Threads: " << threads << L")";
   EmitLine(banner.str(), false);
@@ -432,21 +441,20 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   EmitLine(L"Formatting result to decimal.", false);
   WriteLineToResultFile(L"Formatting result to decimal.");
   const std::wstring outpi = FormatPi(pi, digits, kMaxPrintNumDigits);
+  const std::wstring outpi_full = FormatPi(pi, digits, digits);
   // Emit truncated Pi to the output area / console.
   EmitLine(std::wstring(L"Result: ") + outpi, false);
   // Write full untruncated Pi to the results file.
-  const std::wstring outpi_full = FormatPi(pi, digits, digits);
+  LOG(DEBUG) << L"Writing results to " << kResultsFile;
   WriteLineToResultFile(std::wstring(L"Result: ") + outpi_full);
-  // Separator at bottom of results
-  PrintOutputSeparator();
-  WriteSeparatorToResultFile();
-  FlushResultFile(); // Flush after the potentially huge pi result
+  // Flush after the potentially huge pi result
+  const bool done = FlushResultFile();
 
   // Completion chime. Gated on the Settings -> Sound? menu via
   // g_sound_on. SND_ASYNC kicks playback off on a system thread so
   // we don't block the worker. PlaySoundW is documented thread-safe;
   // the stop-check above ensures we don't chime on a cancelled run.
-  if (g_sound_on) {
+  if (g_sound_on && done) {
     if (!PlayWav(IDR_TADA_WAV)) {
       EmitLine(L"Failed to play tada.wav", true);
     }
