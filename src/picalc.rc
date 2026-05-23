@@ -67,11 +67,12 @@ IDR_MAIN MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        MENUITEM "&Clear Output",     IDM_CLEAROUTPUT
+        MENUITEM "Clear &Results File", IDM_CLEARRESULTS
+        MENUITEM "&Clear Output",       IDM_CLEAROUTPUT
         MENUITEM SEPARATOR
-        MENUITEM "&Save Screenshot",  IDM_SAVEAS
+        MENUITEM "&Save Screenshot",    IDM_SAVEAS
         MENUITEM SEPARATOR
-        MENUITEM "E&xit",       IDM_EXIT
+        MENUITEM "E&xit",               IDM_EXIT
     END
     POPUP "&Settings"
     BEGIN
@@ -80,6 +81,7 @@ BEGIN
     POPUP "&Dev"
     BEGIN
         MENUITEM "Toggle &Console", IDM_CONSOLE
+        MENUITEM "Clear &Log File", IDM_CLEARLOG
     END
     POPUP "&About"
     BEGIN

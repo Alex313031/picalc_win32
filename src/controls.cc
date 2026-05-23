@@ -123,6 +123,7 @@ bool CreateChildControls(HWND parent) {
   const int row2_y  = row1_y + kControlHeight + kPadTop;
   const int row3_y  = row2_y + kControlHeight + kPadTop;
   const int row4_y  = row3_y + kButtonHeight + kVGap;
+  const int row5_y  = row4_y + kButtonHeight + kVGap;
   const int combo_x = kPadLeft + kLabelWidth + kHGap;
   const int col2_x  = kPadLeft + kButtonWidth + kHGap;
 
@@ -162,7 +163,7 @@ bool CreateChildControls(HWND parent) {
   // the centering even though BS_PUSHBUTTON already centres by default.
   hStartButton = CreateWindowExW(
       0, WC_BUTTON, kStartButtonLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER | BS_DEFPUSHBUTTON,
       kPadLeft, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_START_BUTTON)), g_hInstance, nullptr);
   if (hStartButton == nullptr) {
@@ -178,7 +179,7 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
-  // Row 4: Open Out File + About buttons.
+  // Row 4: Open Out File + Console toggle buttons.
   hOpenOutButton = CreateWindowExW(
       0, WC_BUTTON, kOpenOutFileLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
@@ -188,12 +189,31 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
+  hConsoleButton = CreateWindowExW(
+      0, WC_BUTTON, kShowConsoleLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      col2_x, row4_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONSOLE_BUTTON)), g_hInstance, nullptr);
+  if (hConsoleButton == nullptr) {
+    return false;
+  }
+
+  // Row 5: About + Exit buttons.
   hAboutButton = CreateWindowExW(
       0, WC_BUTTON, kAboutButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      col2_x, row4_y, kButtonWidth, kButtonHeight, parent,
+      kPadLeft, row5_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
   if (hAboutButton == nullptr) {
+    return false;
+  }
+
+  hExitButton = CreateWindowExW(
+      0, WC_BUTTON, kExitButtonLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      col2_x, row5_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_EXIT_BUTTON)), g_hInstance, nullptr);
+  if (hExitButton == nullptr) {
     return false;
   }
 
@@ -201,8 +221,9 @@ bool CreateChildControls(HWND parent) {
   // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
   // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
   HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-  const HWND kFontTargets[] = {hDigitsLabel, hDigitsCombo,   hThreadsLabel, hThreadsCombo,
-                               hStartButton, hStopButton,    hOpenOutButton, hAboutButton};
+  const HWND kFontTargets[] = {hDigitsLabel,    hDigitsCombo,  hThreadsLabel,  hThreadsCombo,
+                               hStartButton,    hStopButton,   hOpenOutButton, hAboutButton,
+                               hConsoleButton,  hExitButton};
   for (HWND hCtrl : kFontTargets) {
     SendMessageW(hCtrl, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
   }

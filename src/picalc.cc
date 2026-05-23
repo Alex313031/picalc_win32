@@ -320,10 +320,16 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   int threads      = outer->threads;
   delete outer;
 
+  OpenResultFile();
+  // Separator at top of results
+  PrintOutputSeparator();
+  WriteSeparatorToResultFile();
+
   // Banner: "Started Calculating N digits (Threads: T)".
   std::wostringstream banner;
   banner << kCalculateMessage << digits << L" digits (Threads: " << threads << L")";
   EmitLine(banner.str(), false);
+  WriteLineToResultFile(banner.str());
 
   const DWORD t_start = GetTickCount();
   g_calc_start_tick   = t_start;
@@ -359,10 +365,6 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   }
   ResetMergeProgress(depth);
 
-  // Progress beacon. The user sees this immediately after pressing
-  // Calculate so the UI doesn't look frozen while the workers chew.
-  PrintOutputSeparator();
-
   PQT total;
   BinarySplitParallel(0, N, depth, &total);
 
@@ -397,6 +399,7 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
     std::wostringstream m;
     m << L"Computed final Pi (mpf divide, " << (elapsed / 1000.0) << L"s. elapsed)";
     EmitLine(m.str(), false);
+    WriteLineToResultFile(m.str());
   }
 
   if (StopRequested()) {
@@ -410,24 +413,34 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   std::wostringstream iter_line;
   iter_line << kIterMessage << N;
   EmitLine(iter_line.str(), false);
+  WriteLineToResultFile(iter_line.str());
 
   const DWORD t_end     = GetTickCount();
   const DWORD elapsedMs = t_end - t_start;
   std::wostringstream time_line;
   time_line << kTimeMessage << (elapsedMs / 1000.0) << L" seconds elapsed";
   EmitLine(time_line.str(), false);
+  WriteLineToResultFile(time_line.str());
   SendOutputMessage(L"Done Calculating Pi!");
+  WriteLineToResultFile(L"Done Calculating Pi!");
   // Result, iterations (= BS leaves used), and elapsed time.
-  // Format pi to decimal. With the kMaxPrintNumDigits cap, FormatPi
-  // only converts the digits we'll actually show - cheap. Without
-  // the cap, this is the second single-threaded GMP hotspot (after
-  // mpf_div above), hence the timing line.
+  // The UI caps display at kMaxPrintNumDigits - FormatPi only converts
+  // that many digits so the cheap path stays cheap. The file always
+  // gets the full conversion; for large digit counts that is the second
+  // single-threaded GMP hotspot (after mpf_div above), hence the
+  // timing line.
   EmitLine(L"Formatting result to decimal.", false);
-  const std::wstring outpi       = FormatPi(pi, digits, kMaxPrintNumDigits);
-  // Emit final Pi output to hOutputEdit
+  WriteLineToResultFile(L"Formatting result to decimal.");
+  const std::wstring outpi = FormatPi(pi, digits, kMaxPrintNumDigits);
+  // Emit truncated Pi to the output area / console.
   EmitLine(std::wstring(L"Result: ") + outpi, false);
-
+  // Write full untruncated Pi to the results file.
+  const std::wstring outpi_full = FormatPi(pi, digits, digits);
+  WriteLineToResultFile(std::wstring(L"Result: ") + outpi_full);
+  // Separator at bottom of results
   PrintOutputSeparator();
+  WriteSeparatorToResultFile();
+  FlushResultFile(); // Flush after the potentially huge pi result
 
   // Completion chime. Gated on the Settings -> Sound? menu via
   // g_sound_on. SND_ASYNC kicks playback off on a system thread so

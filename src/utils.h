@@ -95,7 +95,9 @@ bool PlayWav(UINT resid);
 // Result file (GetExeDir() + kResultsFile, UTF-16 LE)
 // =========================================================================
 
-// Creates or truncates the result file and writes a UTF-16 LE BOM.
+// Opens the result file at GetExeDir()+kResultsFile in append mode.
+// Creates the file with a UTF-16 LE BOM if it does not yet exist;
+// seeks to the end if it does, preserving prior results.
 // Must be called before any AppendToResultFile calls.
 bool OpenResultFile();
 
@@ -123,5 +125,12 @@ bool IsResultFileOpen();
 
 // Opens the result file in the system default viewer via ShellExecuteW.
 bool ShellOpenResultFile(HWND hWnd);
+
+// Appends `line` + CRLF to the result file.
+bool WriteLineToResultFile(const std::wstring& line);
+
+// Appends the 90-asterisk separator + CRLF to the result file,
+// matching the width used by PrintOutputSeparator().
+bool WriteSeparatorToResultFile();
 
 #endif // PICALCWIN32_UTILS_H_

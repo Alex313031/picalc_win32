@@ -25,6 +25,8 @@
 
 #define IDM_SOUND                   250
 #define IDM_CONSOLE                 251
+#define IDM_CLEARRESULTS            252
+#define IDM_CLEARLOG                253
 
 // Embedded background sound WAV files
 #define IDR_TADA_WAV                500
@@ -42,6 +44,8 @@
 #define IDC_STOP_BUTTON             607
 #define IDC_OPENOUT_BUTTON          608
 #define IDC_ABOUT_BUTTON            609
+#define IDC_CONSOLE_BUTTON          610
+#define IDC_EXIT_BUTTON             611
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC

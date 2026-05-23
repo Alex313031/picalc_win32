@@ -23,8 +23,10 @@ HWND hThreadsLabel = nullptr;
 HWND hThreadsCombo = nullptr;
 HWND hStartButton   = nullptr;
 HWND hStopButton    = nullptr;
-HWND hOpenOutButton = nullptr;
-HWND hAboutButton   = nullptr;
+HWND hOpenOutButton  = nullptr;
+HWND hAboutButton    = nullptr;
+HWND hConsoleButton  = nullptr;
+HWND hExitButton     = nullptr;
 
 HINSTANCE g_hInstance = nullptr;
 
@@ -74,7 +76,7 @@ static bool s_console_hidden = false;
 // Whether window was minimized or not
 static bool s_was_minimized = false;
 
-COLORREF g_bkg_color = RGB_LTGREY;
+COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE);
 
 // =========================================================================
 // Static forward declarations
@@ -103,9 +105,10 @@ bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className) {
   wndclass.hInstance   = hInstance;
   wndclass.hIcon       = kMainIcon;
   wndclass.hCursor     = LoadCursorW(nullptr, IDC_ARROW);
-  // We handle erase + paint ourselves - WM_ERASEBKGND returns
-  // TRUE and WM_PAINT fills with g_bkg_color. Set to black default as fallback.
-  wndclass.hbrBackground = CreateSolidBrush(g_bkg_color);
+  // We handle erase + paint ourselves - WM_ERASEBKGND returns TRUE
+  // and WM_PAINT fills with g_bkg_color. Use the system pseudo-brush
+  // so the OS updates it automatically on WM_SYSCOLORCHANGE.
+  wndclass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_3DFACE + 1);
   wndclass.lpszMenuName  = MAKEINTRESOURCEW(IDR_MAIN);
   wndclass.lpszClassName = className;
   wndclass.hIconSm       = kSmallIcon;
@@ -220,10 +223,16 @@ static void UpdateConsoleToggleMenu(HWND hWnd) {
   // Respect the .rc's GRAYED flag: if the build disabled this item,
   // never re-enable it or touch its label.
   if (s_console_menu_user_disabled) {
+    if (hConsoleButton != nullptr) {
+      EnableWindow(hConsoleButton, FALSE);
+    }
     return;
   }
   if (!logging::GetIsConsoleAttached()) {
     EnableMenuItem(menu, IDM_CONSOLE, MF_BYCOMMAND | MF_GRAYED);
+    if (hConsoleButton != nullptr) {
+      EnableWindow(hConsoleButton, FALSE);
+    }
     return;
   }
   EnableMenuItem(menu, IDM_CONSOLE, MF_BYCOMMAND | MF_ENABLED);
@@ -231,12 +240,16 @@ static void UpdateConsoleToggleMenu(HWND hWnd) {
   // we don't query IsWindowVisible here).
   // SetMenuItemInfoW with MIIM_STRING copies the string, so passing a
   // string-literal pointer through const_cast is safe.
-  MENUITEMINFOW mii = {};
-  mii.cbSize        = sizeof(mii);
-  mii.fMask         = MIIM_STRING;
-  mii.dwTypeData =
-      const_cast<LPWSTR>(s_console_hidden ? kShowConsoleLabel : kHideConsoleLabel);
+  const LPCWSTR label = s_console_hidden ? kShowConsoleLabel : kHideConsoleLabel;
+  MENUITEMINFOW mii   = {};
+  mii.cbSize          = sizeof(mii);
+  mii.fMask           = MIIM_STRING;
+  mii.dwTypeData      = const_cast<LPWSTR>(label);
   SetMenuItemInfoW(menu, IDM_CONSOLE, FALSE, &mii);
+  if (hConsoleButton != nullptr) {
+    EnableWindow(hConsoleButton, TRUE);
+    SetWindowTextW(hConsoleButton, label);
+  }
 }
 
 int APIENTRY wWinMain(HINSTANCE hInstance,
@@ -493,6 +506,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           break;
         }
+        case IDC_CONSOLE_BUTTON:
+          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CONSOLE, 0), 0);
+          break;
+        case IDC_EXIT_BUTTON:
+          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CEXIT, 0), 0);
+          break;
         case IDC_OPENOUT_BUTTON:
           if (!ShellOpenResultFile(hWnd)) {
             ErrorBox(hWnd, L"Open File Error", L"Failed to open result file.");
@@ -508,8 +527,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_HELP:
           LaunchHelp(hWnd);
           break;
+        case IDM_CLEARRESULTS:
+          if (!ClearResultFile()) {
+            ErrorBox(hWnd, L"Results File Error", L"Failed to clear results file.");
+          }
+          break;
         case IDM_CLEAROUTPUT:
           ClearOutput();
+          break;
+        case IDM_CLEARLOG:
+          if (!logging::ClearFileContents()) {
+            ErrorBox(hWnd, L"Log File Error", L"Failed to clear log file.");
+          }
           break;
         case IDM_SAVEAS: {
           std::wstring savepath;
@@ -605,9 +634,6 @@ bool InitApp(HWND hWnd) {
   // Pull defaults from the menu's CHECKED state first,
   // so they need the final values by the time they run.
   ApplyMenuDefaults(hWnd);
-  if (!OpenResultFile()) {
-    LOG(ERROR) << L"Failed to open result file: " << (GetExeDir() + kResultsFile);
-  }
   return true;
 }
 

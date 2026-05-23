@@ -485,22 +485,31 @@ bool OpenResultFile() {
   if (path.length() >= MAX_PATH) {
     return false;
   }
-  // CREATE_ALWAYS: create new or truncate existing. FILE_ATTRIBUTE_NORMAL
+  // OPEN_ALWAYS: create if absent, open if present. FILE_ATTRIBUTE_NORMAL
   // (no FILE_FLAG_WRITE_THROUGH) lets the OS buffer writes in the page
   // cache - critical for sequential million-digit output where per-write
   // kernel flushes would dominate wall time.
   g_result_file = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
-                              FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+                              FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
                               FILE_ATTRIBUTE_NORMAL, nullptr);
   if (g_result_file == INVALID_HANDLE_VALUE) {
     return false;
   }
-  // Write UTF-16 LE BOM (FF FE).
-  static const WORD kBOM = 0xFEFF;
-  DWORD written          = 0;
-  if (!WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr)) {
-    CloseResultFile();
-    return false;
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    // Existing file: seek to end so new results append after prior ones.
+    if (SetFilePointer(g_result_file, 0, nullptr, FILE_END) == INVALID_SET_FILE_POINTER &&
+        GetLastError() != NO_ERROR) {
+      CloseResultFile();
+      return false;
+    }
+  } else {
+    // New file: write UTF-16 LE BOM (FF FE).
+    static const WORD kBOM = 0xFEFF;
+    DWORD written          = 0;
+    if (!WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr)) {
+      CloseResultFile();
+      return false;
+    }
   }
   return true;
 }
@@ -521,7 +530,9 @@ bool AppendToResultFile(const std::wstring& text) {
 
 bool ClearResultFile() {
   if (g_result_file == INVALID_HANDLE_VALUE) {
-    return false;
+    if (!OpenResultFile()) {
+      return false;
+    }
   }
   FlushFileBuffers(g_result_file);
   if (SetFilePointer(g_result_file, 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER &&
@@ -555,6 +566,16 @@ void CloseResultFile() {
 
 bool IsResultFileOpen() {
   return g_result_file != INVALID_HANDLE_VALUE;
+}
+
+bool WriteLineToResultFile(const std::wstring& line) {
+  return AppendToResultFile(line + L"\r\n");
+}
+
+bool WriteSeparatorToResultFile() {
+  static constexpr int kSeparatorWidth = 90;
+  static const std::wstring kSep(kSeparatorWidth, L'*');
+  return WriteLineToResultFile(kSep);
 }
 
 bool ShellOpenResultFile(HWND hWnd) {

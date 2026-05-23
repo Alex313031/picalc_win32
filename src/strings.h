@@ -19,6 +19,7 @@ inline const wchar_t* const kShowConsoleLabel = L"Show Console";
 inline const wchar_t* const kHideConsoleLabel = L"Hide Console";
 inline const wchar_t* const kOpenOutFileLabel = L"Open Out File";
 inline const wchar_t* const kAboutButtonLabel = L"About";
+inline const wchar_t* const kExitButtonLabel  = L"Exit";
 
 // Combobox items: Order = display order.
 inline const wchar_t* const kDigitOptions[] = {
