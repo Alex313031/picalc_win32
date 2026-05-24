@@ -101,14 +101,18 @@ inline bool StopRequested() {
 // reasonable start_depth (ceil(log2(kMaxNumThreads))). Reset to 0
 // at the start of each calc via ResetMergeProgress.
 constexpr int kMaxMergeLevels = 33;
-std::atomic<int> g_combines_at_level[kMaxMergeLevels];
-int g_start_depth      = 0;     // Set once per calc
-DWORD g_calc_start_tick = 0;    // Captured by CalcThreadProc
+std::atomic<int>  g_combines_at_level[kMaxMergeLevels];
+std::atomic<DWORD> g_level_start_tick[kMaxMergeLevels]; // tick when first combine at level fires
+int g_start_depth       = 0; // Set once per calc
+int g_total_depth       = 0; // g_start_depth + 1
+DWORD g_calc_start_tick = 0; // Captured by CalcThreadProc
 
 void ResetMergeProgress(int start_depth) {
   g_start_depth = start_depth;
+  g_total_depth = g_start_depth + 1;
   for (int i = 0; i < kMaxMergeLevels; ++i) {
     g_combines_at_level[i].store(0, std::memory_order_relaxed);
+    g_level_start_tick[i].store(0, std::memory_order_relaxed);
   }
 }
 
@@ -123,11 +127,14 @@ void NoteCombineComplete(int depth) {
   }
   const int count    = g_combines_at_level[depth].fetch_add(1, std::memory_order_relaxed) + 1;
   const int expected = 1 << (g_start_depth - depth);
+  if (count == 1) {
+    g_level_start_tick[depth].store(GetTickCount(), std::memory_order_release);
+  }
   if (count == expected) {
-    const DWORD elapsed_ms = GetTickCount() - g_calc_start_tick;
+    const DWORD level_ms = GetTickCount() - g_level_start_tick[depth].load(std::memory_order_acquire);
     std::wostringstream m;
-    m << L"Merge level " << depth << L" of " << g_start_depth << L" done ("
-      << expected << L" mpf multiply, " << (elapsed_ms / 1000.0) << L"s. elapsed)";
+    m << L"Merge level " << depth << L" of " << g_total_depth << L" done ("
+      << expected << L" mpf combines, " << (level_ms / 1000.0) << L"s.)";
     EmitLine(m.str(), false);
   }
 }
@@ -330,7 +337,7 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   const WORD   h12  = (st.wHour % 12 == 0) ? 12 : st.wHour % 12;
   const wchar_t* ampm = (st.wHour < 12) ? L"AM" : L"PM";
   wchar_t ts[32];
-  swprintf(ts, 32, L"%02u/%02u/%02u %02u:%02u:%02u %s",
+  swprintf(ts, 32, L"%02u/%02u/%02u %02u:%02u:%02u %ls",
            st.wMonth, st.wDay, st.wYear % 100,
            h12, st.wMinute, st.wSecond, ampm);
   EmitLine(ts, false);
@@ -376,14 +383,26 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
 
   PQT total;
   BinarySplitParallel(0, N, depth, &total);
+  const DWORD t_bs_end = GetTickCount();
 
-  // Rejoin the parallel sqrt before using it. If CreateThread had
-  // failed at the top, do the sqrt inline now instead.
+  // Rejoin the parallel sqrt. Log the wait (or inline cost) as its own
+  // stage so every gap between t_start and t_end is accounted for.
   if (sqrt_handle != nullptr) {
     WaitForSingleObject(sqrt_handle, INFINITE);
     CloseHandle(sqrt_handle);
+    const DWORD sqrt_wait_ms = GetTickCount() - t_bs_end;
+    if (sqrt_wait_ms > 0) {
+      std::wostringstream m;
+      m << L"Waited " << (sqrt_wait_ms / 1000.0) << L"s. for sqrt(10005)";
+      EmitLine(m.str(), false);
+    }
   } else {
+    // CreateThread failed — run sqrt inline and log it as a stage.
+    const DWORD sq_start = GetTickCount();
     mpf_sqrt_ui(sqrt_args.sqrt_result.get_mpf_t(), 10005);
+    std::wostringstream m;
+    m << L"sqrt(10005): " << ((GetTickCount() - sq_start) / 1000.0) << L"s.";
+    EmitLine(m.str(), false);
   }
 
   if (StopRequested()) {
@@ -406,10 +425,16 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   {
     const DWORD elapsed = GetTickCount() - mpf_start;
     std::wostringstream m;
-    m << L"Computed final Pi (mpf divide, " << (elapsed / 1000.0) << L"s. elapsed)";
+    m << L"Merge level " << g_total_depth << L" of " << g_total_depth
+      << L" done (1 mpf divide, " << (elapsed / 1000.0) << L"s.)";
     EmitLine(m.str(), false);
     WriteLineToResultFile(m.str());
   }
+  // Capture t_end immediately after the pi value is computed, before any
+  // EmitLine calls (which cross thread boundaries and add UI latency).
+  // This makes the total time a clean sum of the logged stages.
+  const DWORD t_end     = GetTickCount();
+  const DWORD elapsedMs = t_end - t_start;
 
   if (StopRequested()) {
     std::wostringstream m;
@@ -423,23 +448,18 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   iter_line << kIterMessage << N;
   EmitLine(iter_line.str(), false);
   WriteLineToResultFile(iter_line.str());
-
-  const DWORD t_end     = GetTickCount();
-  const DWORD elapsedMs = t_end - t_start;
   std::wostringstream time_line;
-  time_line << kTimeMessage << (elapsedMs / 1000.0) << L" seconds elapsed";
+  time_line << kDoneMessage << (elapsedMs / 1000.0) << L" seconds elapsed.";
   EmitLine(time_line.str(), false);
   WriteLineToResultFile(time_line.str());
-  SendOutputMessage(L"Done Calculating Pi!");
-  WriteLineToResultFile(L"Done Calculating Pi!");
   // Result, iterations (= BS leaves used), and elapsed time.
   // The UI caps display at kMaxPrintNumDigits - FormatPi only converts
   // that many digits so the cheap path stays cheap. The file always
   // gets the full conversion; for large digit counts that is the second
   // single-threaded GMP hotspot (after mpf_div above), hence the
   // timing line.
-  EmitLine(L"Formatting result to decimal.", false);
-  WriteLineToResultFile(L"Formatting result to decimal.");
+  EmitLine(L"Formatting result to decimal...", false);
+  WriteLineToResultFile(L"Formatting result to decimal...");
   const std::wstring outpi = FormatPi(pi, digits, kMaxPrintNumDigits);
   const std::wstring outpi_full = FormatPi(pi, digits, digits);
   // Emit truncated Pi to the output area / console.

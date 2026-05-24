@@ -4,11 +4,10 @@
 #include "version.h"
 
 // Strings to print
-inline const wchar_t* const kCalculateMessage = L"Started Calculating ";
-inline const wchar_t* const kStoppedMessage   = L"Stopped Calculating ";
-inline const wchar_t* const kDoneMessage      = L"Done Calculating ";
-inline const wchar_t* const kIterMessage      = L"Number of Iterations: ";
-inline const wchar_t* const kTimeMessage      = L"Time: ";
+inline const wchar_t* const kCalculateMessage = L"Started calculating ";
+inline const wchar_t* const kStoppedMessage   = L"Stopped calculating ";
+inline const wchar_t* const kDoneMessage      = L"Done! ";
+inline const wchar_t* const kIterMessage      = L"Num. Iterations: ";
 
 // Controls strings
 inline const wchar_t* const kNumDigitsLabel   = L"Number of Digits:";
@@ -17,7 +16,10 @@ inline const wchar_t* const kStartButtonLabel = L"Calculate!";
 inline const wchar_t* const kStopButtonLabel  = L"Stop";
 inline const wchar_t* const kShowConsoleLabel = L"Show Console";
 inline const wchar_t* const kHideConsoleLabel = L"Hide Console";
-inline const wchar_t* const kOpenOutFileLabel = L"Open Out File";
+inline const wchar_t* const kOpenResultLabel  = L"Open Results";
+inline const wchar_t* const kCloseResultLabel = L"Close Results";
+inline const wchar_t* const kClearResultLabel = L"Clear Result File";
+inline const wchar_t* const kClearOutputLabel = L"Clear Status Pane";
 inline const wchar_t* const kAboutButtonLabel = L"About";
 inline const wchar_t* const kExitButtonLabel  = L"Exit";
 inline const wchar_t* const kCntrlsGroupLabel = L"Controls";

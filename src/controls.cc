@@ -147,6 +147,7 @@ bool CreateChildControls(HWND parent) {
   const int row3_y  = row2_y + kControlHeight + kPadTop;
   const int row4_y  = row3_y + kButtonHeight + kVGap;
   const int row5_y  = row4_y + kButtonHeight + kVGap;
+  const int row6_y  = row5_y + kButtonHeight + kVGap;
   const int combo_x = kPadLeft + kLabelWidth + kHGap;
   // Centre the two-button rows within the groupbox. The label+combo rows
   // are already centred by construction (kPadLeft was chosen symmetrically).
@@ -210,7 +211,7 @@ bool CreateChildControls(HWND parent) {
 
   // Row 4: Open Out File + Console toggle buttons.
   hOpenOutButton = CreateWindowExW(
-      0, WC_BUTTON, kOpenOutFileLabel,
+      0, WC_BUTTON, kOpenResultLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kBtnLeft, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
@@ -227,11 +228,30 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
-  // Row 5: About + Exit buttons.
+  // Row 5: Clear Results + Clear Output buttons.
+  hClearResultButton = CreateWindowExW(
+      0, WC_BUTTON, kClearResultLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      kBtnLeft, row5_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEARRESULT_BUTTON)), g_hInstance, nullptr);
+  if (hClearResultButton == nullptr) {
+    return false;
+  }
+
+  hClearOutputButton = CreateWindowExW(
+      0, WC_BUTTON, kClearOutputLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      col2_x, row5_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEAROUTPUT_BUTTON)), g_hInstance, nullptr);
+  if (hClearOutputButton == nullptr) {
+    return false;
+  }
+
+  // Row 6: About + Exit buttons.
   hAboutButton = CreateWindowExW(
       0, WC_BUTTON, kAboutButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kBtnLeft, row5_y, kButtonWidth, kButtonHeight, parent,
+      kBtnLeft, row6_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
   if (hAboutButton == nullptr) {
     return false;
@@ -240,7 +260,7 @@ bool CreateChildControls(HWND parent) {
   hExitButton = CreateWindowExW(
       0, WC_BUTTON, kExitButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      col2_x, row5_y, kButtonWidth, kButtonHeight, parent,
+      col2_x, row6_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_EXIT_BUTTON)), g_hInstance, nullptr);
   if (hExitButton == nullptr) {
     return false;
@@ -250,9 +270,11 @@ bool CreateChildControls(HWND parent) {
   // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
   // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
   HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-  const HWND kFontTargets[] = {s_hGroupBox,     hDigitsLabel,  hDigitsCombo,   hThreadsLabel,
-                               hThreadsCombo,   hStartButton,  hStopButton,    hOpenOutButton,
-                               hAboutButton,    hConsoleButton, hExitButton};
+  const HWND kFontTargets[] = {s_hGroupBox,        hDigitsLabel,       hDigitsCombo,
+                               hThreadsLabel,      hThreadsCombo,      hStartButton,
+                               hStopButton,        hOpenOutButton,     hConsoleButton,
+                               hClearResultButton, hClearOutputButton, hAboutButton,
+                               hExitButton};
   for (HWND hCtrl : kFontTargets) {
     SendMessageW(hCtrl, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
   }

@@ -23,8 +23,10 @@ HWND hThreadsLabel = nullptr;
 HWND hThreadsCombo = nullptr;
 HWND hStartButton   = nullptr;
 HWND hStopButton    = nullptr;
-HWND hOpenOutButton  = nullptr;
-HWND hAboutButton    = nullptr;
+HWND hOpenOutButton      = nullptr;
+HWND hClearResultButton  = nullptr;
+HWND hClearOutputButton  = nullptr;
+HWND hAboutButton        = nullptr;
 HWND hConsoleButton  = nullptr;
 HWND hExitButton     = nullptr;
 
@@ -540,6 +542,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (!ShellOpenResultFile(hWnd)) {
             ErrorBox(hWnd, L"Open File Error", L"Failed to open result file.");
           }
+          break;
+        case IDC_CLEARRESULT_BUTTON:
+          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CLEARRESULTS, 0), 0);
+          break;
+        case IDC_CLEAROUTPUT_BUTTON:
+          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CLEAROUTPUT, 0), 0);
           break;
         case IDC_STOP_BUTTON:
           if (!g_running) {

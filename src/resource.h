@@ -48,6 +48,8 @@
 #define IDC_CONSOLE_BUTTON          610
 #define IDC_EXIT_BUTTON             611
 #define IDC_CONTROLS_GROUP          612
+#define IDC_CLEARRESULT_BUTTON      613
+#define IDC_CLEAROUTPUT_BUTTON      614
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC

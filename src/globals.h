@@ -21,8 +21,10 @@ extern HWND hThreadsLabel; // Static label: "Num. CPU Threads:"
 extern HWND hThreadsCombo; // Dropdown picker for the thread count
 extern HWND hStartButton;   // "Calculate!" button
 extern HWND hStopButton;    // "Stop" button
-extern HWND hOpenOutButton;  // "Open Out File" button
-extern HWND hAboutButton;    // "About" button
+extern HWND hOpenOutButton;      // "Open Out File" button
+extern HWND hClearResultButton;  // "Clear Results" button
+extern HWND hClearOutputButton;  // "Clear Output" button
+extern HWND hAboutButton;        // "About" button
 extern HWND hConsoleButton;  // "Show/Hide Console" button (label tracks state)
 extern HWND hExitButton;     // "Exit" button
 

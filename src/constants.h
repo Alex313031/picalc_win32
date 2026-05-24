@@ -40,7 +40,7 @@ inline constexpr INT kHGap          = 5;
 inline constexpr INT kVGap          = 7;
 inline constexpr INT kLabelWidth    = 100;
 inline constexpr INT kControlHeight = 21;
-inline constexpr INT kComboWidth    = 90;
+inline constexpr INT kComboWidth    = 100;
 inline constexpr INT kButtonWidth   = kComboWidth;
 inline constexpr INT kButtonHeight  = 28;
 // Height passed to a combobox at create time is the *dropdown list*
