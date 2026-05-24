@@ -16,12 +16,12 @@
 #define RGB_MAGENTA RGB(255, 0, 255)
 
 // Default desired outer window size at startup.
-inline constexpr INT CW_WIDTH  = 600;
-inline constexpr INT CW_HEIGHT = 800;
+inline constexpr INT CW_WIDTH  = 700;
+inline constexpr INT CW_HEIGHT = 600;
 
 // Min window size
-inline constexpr INT CW_MINWIDTH  = 320;
-inline constexpr INT CW_MINHEIGHT = 480;
+inline constexpr INT CW_MINWIDTH  = 480;
+inline constexpr INT CW_MINHEIGHT = 420;
 
 // Splitter bar dimensions (height in px) and the minimum height either
 // pane (top controls / bottom output) is allowed to shrink to while
@@ -30,10 +30,15 @@ inline constexpr INT     kSplitterHeight      = 10;
 inline constexpr INT     kSplitterHandleWidth = 14;
 inline constexpr INT     kSplitterHandleHeight = 1;
 inline constexpr COLORREF kSplitterHandleColor = RGB_GREY;
-inline constexpr INT     kMinPaneHeight       = CW_MINHEIGHT / 2;
+
+// Default to a 1/2 top, 1/2 bottom pane split on first layout.
+// Computed in float so the ratio is explicit.
+inline constexpr float kTopPaneFraction = 1.0f / 2.0f;
 
 // Top-pane control layout (in pixels, relative to the parent client area).
-inline constexpr INT kGroupMargin   = 7;
+inline constexpr INT kGroupMargin   = 7;   // groupbox outer margin: left, right, bottom
+inline constexpr INT kGroupOuterTop = 10;  // groupbox outer margin: top (distance from client top to frame line)
+inline constexpr INT kGroupInnerPad = 14;  // inner padding: frame line → first control row
 inline constexpr INT kPadLeft       = 14;
 inline constexpr INT kPadTop        = 14;
 inline constexpr INT kHGap          = 5;
@@ -47,6 +52,23 @@ inline constexpr INT kButtonHeight  = 28;
 // height when open, not the always-visible field height (that's font-
 // derived). 200px gives room for ~8 options without scrolling.
 inline constexpr INT kComboDropHeight = 200;
+
+// Minimum top-pane height: enough to show all 6 button rows with inner and
+// outer groupbox padding, derived from layout constants so it stays in sync.
+//   row1_y                            = kGroupOuterTop + kGroupInnerPad
+//   + 2 label/combo row gaps          = (kControlHeight + kPadTop) * 2
+//   + 3 button row gaps               = (kButtonHeight + kVGap) * 3
+//   + last row height                 = kButtonHeight
+//   + inner bottom pad (frame gap)    = kVGap
+//   + outer bottom margin             = kGroupMargin
+inline constexpr INT kMinTopHeight =
+    (kGroupOuterTop + kGroupInnerPad) +
+    (kControlHeight + kPadTop) * 2 +
+    (kButtonHeight  + kVGap)   * 3 +
+    kButtonHeight + kVGap + kGroupMargin;
+
+// Minimum height of the output (bottom) pane.
+inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 2;
 
 inline constexpr UINT kMinNumDigits = 1u; // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap

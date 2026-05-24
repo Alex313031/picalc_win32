@@ -142,24 +142,23 @@ bool CreateChildControls(HWND parent) {
   // Top pane: stacked rows of "label + combobox" pickers. SS_CENTERIMAGE
   // vertically centres the label text so it aligns with the combo's
   // text baseline.
-  const int row1_y  = kPadTop + kGroupMargin;
-  const int row2_y  = row1_y + kControlHeight + kPadTop;
-  const int row3_y  = row2_y + kControlHeight + kPadTop;
-  const int row4_y  = row3_y + kButtonHeight + kVGap;
-  const int row5_y  = row4_y + kButtonHeight + kVGap;
-  const int row6_y  = row5_y + kButtonHeight + kVGap;
-  const int combo_x = kPadLeft + kLabelWidth + kHGap;
-  // Centre the two-button rows within the groupbox. The label+combo rows
-  // are already centred by construction (kPadLeft was chosen symmetrically).
-  constexpr int kGroupW       = kPadLeft + kLabelWidth + kHGap + kComboWidth;
-  constexpr int kGroupCenterX = kGroupMargin + kGroupW / 2;
-  constexpr int kBtnRowW      = kButtonWidth * 2 + kHGap;
-  constexpr int kBtnLeft      = kGroupCenterX - kBtnRowW / 2;
-  constexpr int col2_x        = kBtnLeft + kButtonWidth + kHGap;
+  const int row1_y = kGroupOuterTop + kGroupInnerPad;
+  const int row2_y = row1_y + kControlHeight + kPadTop;
+  const int row3_y = row2_y + kControlHeight + kPadTop;
+  const int row4_y = row3_y + kButtonHeight + kVGap;
+  const int row5_y = row4_y + kButtonHeight + kVGap;
+  const int row6_y = row5_y + kButtonHeight + kVGap;
+  // All rows (label+combo and button pairs) have the same width, so a single
+  // centering formula applies to every row. The controls area of the groupbox
+  // has kGroupMargin padding on both sides; centre within that region.
+  constexpr int kRowWidth    = kLabelWidth + kHGap + kComboWidth;
+  constexpr int kAreaCenterX = kGroupMargin + (kRowWidth + 2 * kGroupMargin) / 2;
+  constexpr int kRowLeft     = kAreaCenterX - kRowWidth / 2;
+  constexpr int kRowCol2     = kRowLeft + kLabelWidth + kHGap;
 
   hDigitsLabel = CreateWindowExW(
       0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
-      kPadLeft, row1_y, kLabelWidth, kControlHeight, parent,
+      kRowLeft, row1_y, kLabelWidth, kControlHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)), g_hInstance, nullptr);
   if (hDigitsLabel == nullptr) {
     return false;
@@ -167,7 +166,7 @@ bool CreateChildControls(HWND parent) {
 
   hDigitsCombo = CreateWindowExW(
       0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
-      combo_x, row1_y, kComboWidth, kComboDropHeight, parent,
+      kRowCol2, row1_y, kComboWidth, kComboDropHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_COMBO)), g_hInstance, nullptr);
   if (hDigitsCombo == nullptr) {
     return false;
@@ -175,7 +174,7 @@ bool CreateChildControls(HWND parent) {
 
   hThreadsLabel = CreateWindowExW(
       0, WC_STATIC, kNumThreadsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
-      kPadLeft, row2_y, kLabelWidth, kControlHeight, parent,
+      kRowLeft, row2_y, kLabelWidth, kControlHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_LABEL)), g_hInstance, nullptr);
   if (hThreadsLabel == nullptr) {
     return false;
@@ -183,7 +182,7 @@ bool CreateChildControls(HWND parent) {
 
   hThreadsCombo = CreateWindowExW(
       0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
-      combo_x, row2_y, kComboWidth, kComboDropHeight, parent,
+      kRowCol2, row2_y, kComboWidth, kComboDropHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_COMBO)), g_hInstance, nullptr);
   if (hThreadsCombo == nullptr) {
     return false;
@@ -194,7 +193,7 @@ bool CreateChildControls(HWND parent) {
   hStartButton = CreateWindowExW(
       0, WC_BUTTON, kStartButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER | BS_DEFPUSHBUTTON,
-      kBtnLeft, row3_y, kButtonWidth, kButtonHeight, parent,
+      kRowLeft, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_START_BUTTON)), g_hInstance, nullptr);
   if (hStartButton == nullptr) {
     return false;
@@ -203,7 +202,7 @@ bool CreateChildControls(HWND parent) {
   hStopButton = CreateWindowExW(
       0, WC_BUTTON, kStopButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      col2_x, row3_y, kButtonWidth, kButtonHeight, parent,
+      kRowCol2, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_STOP_BUTTON)), g_hInstance, nullptr);
   if (hStopButton == nullptr) {
     return false;
@@ -213,7 +212,7 @@ bool CreateChildControls(HWND parent) {
   hOpenOutButton = CreateWindowExW(
       0, WC_BUTTON, kOpenResultLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kBtnLeft, row4_y, kButtonWidth, kButtonHeight, parent,
+      kRowLeft, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
   if (hOpenOutButton == nullptr) {
     return false;
@@ -222,7 +221,7 @@ bool CreateChildControls(HWND parent) {
   hConsoleButton = CreateWindowExW(
       0, WC_BUTTON, kShowConsoleLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      col2_x, row4_y, kButtonWidth, kButtonHeight, parent,
+      kRowCol2, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONSOLE_BUTTON)), g_hInstance, nullptr);
   if (hConsoleButton == nullptr) {
     return false;
@@ -232,7 +231,7 @@ bool CreateChildControls(HWND parent) {
   hClearResultButton = CreateWindowExW(
       0, WC_BUTTON, kClearResultLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kBtnLeft, row5_y, kButtonWidth, kButtonHeight, parent,
+      kRowLeft, row5_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEARRESULT_BUTTON)), g_hInstance, nullptr);
   if (hClearResultButton == nullptr) {
     return false;
@@ -241,7 +240,7 @@ bool CreateChildControls(HWND parent) {
   hClearOutputButton = CreateWindowExW(
       0, WC_BUTTON, kClearOutputLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      col2_x, row5_y, kButtonWidth, kButtonHeight, parent,
+      kRowCol2, row5_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEAROUTPUT_BUTTON)), g_hInstance, nullptr);
   if (hClearOutputButton == nullptr) {
     return false;
@@ -251,7 +250,7 @@ bool CreateChildControls(HWND parent) {
   hAboutButton = CreateWindowExW(
       0, WC_BUTTON, kAboutButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kBtnLeft, row6_y, kButtonWidth, kButtonHeight, parent,
+      kRowLeft, row6_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
   if (hAboutButton == nullptr) {
     return false;
@@ -260,7 +259,7 @@ bool CreateChildControls(HWND parent) {
   hExitButton = CreateWindowExW(
       0, WC_BUTTON, kExitButtonLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      col2_x, row6_y, kButtonWidth, kButtonHeight, parent,
+      kRowCol2, row6_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_EXIT_BUTTON)), g_hInstance, nullptr);
   if (hExitButton == nullptr) {
     return false;
@@ -296,6 +295,18 @@ int GetSplitterY() {
   return s_splitter_y;
 }
 
+int GetClampedSplitterY(int cy) {
+  if (s_splitter_y < 0) {
+    return static_cast<int>(static_cast<float>(cy) * kTopPaneFraction);
+  }
+  const int min_y = kMinTopHeight;
+  const int max_y = cy - kMinBottomHeight - kSplitterHeight;
+  if (max_y < min_y) return min_y;
+  if (s_splitter_y < min_y) return min_y;
+  if (s_splitter_y > max_y) return max_y;
+  return s_splitter_y;
+}
+
 void SetSplitterY(int y) {
   s_splitter_y = y;
 }
@@ -312,19 +323,17 @@ void LayoutChildren(HWND parent) {
   if (cx <= 0 || cy <= 0) {
     return;
   }
-  // Default to a 1/3 top, 2/3 bottom split on first layout. Computed in
-  // float so the ratio is explicit; truncated to int at the end since
+  // kTopPaneFraction is 0.5 truncated to int at the end since
   // the splitter Y is a pixel value.
   if (s_splitter_y < 0) {
-    static constexpr float kTopPaneFraction = 1.0f / 3.0f;
     s_splitter_y = static_cast<int>(static_cast<float>(cy) * kTopPaneFraction);
   }
   // Clamp into a local for layout; don't write back to s_splitter_y.
   // Otherwise shrinking the window past the user's splitter Y would
   // overwrite their preference, so growing the window again wouldn't
   // restore the original position.
-  const int min_y = kMinPaneHeight;
-  const int max_y = cy - kMinPaneHeight - kSplitterHeight;
+  const int min_y = kMinTopHeight;
+  const int max_y = cy - kMinBottomHeight - kSplitterHeight;
   int splitter_top = s_splitter_y;
   if (max_y < min_y) {
     // Window is too small for both panes + splitter at minimum
@@ -339,12 +348,14 @@ void LayoutChildren(HWND parent) {
   const int bottom_top = splitter_top + kSplitterHeight;
   const int bottom_h   = (cy > bottom_top) ? (cy - bottom_top) : 0;
 
-  // Group box: 7px margin on left/top/bottom. Right edge is 7px past the
-  // widest controls (label + combo row) so the right side of the client
-  // area stays free for future additions (e.g. system monitor widgets).
+  // Group box: kGroupMargin (7px) on left/right/bottom; frame line lands at
+  // kGroupOuterTop (10px) from client top, so the HWND sits 3px below the
+  // client top (kGroupOuterTop - kGroupMargin). Right edge is kGroupMargin
+  // past the widest controls so the right side stays free for future widgets.
   constexpr int kControlsRight = kPadLeft + kLabelWidth + kHGap + kComboWidth;
+  constexpr int kGroupHwndTop  = kGroupOuterTop - kGroupMargin; // = 3
   const int group_w = kControlsRight + kGroupMargin;
-  const int group_h = splitter_top - kGroupMargin;
+  const int group_h = splitter_top - kGroupMargin - kGroupHwndTop;
 
   // Batch all moves atomically via DeferWindowPos so the children
   // reposition in a single pass - no intermediate state is painted,
@@ -353,7 +364,7 @@ void LayoutChildren(HWND parent) {
   HDWP hdwp = BeginDeferWindowPos(3);
   if (hdwp != nullptr) {
     hdwp = DeferWindowPos(hdwp, s_hGroupBox, nullptr,
-                          kGroupMargin, 0, group_w, group_h,
+                          kGroupMargin, kGroupHwndTop, group_w, group_h,
                           SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (hdwp != nullptr) {

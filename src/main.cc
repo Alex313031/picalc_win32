@@ -428,7 +428,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       HDC hdc = reinterpret_cast<HDC>(wParam);
       RECT rc;
       GetClientRect(hWnd, &rc);
-      const int spl = GetSplitterY();
+      const int spl = GetClampedSplitterY(cyClient);
       if (spl > 0) {
         rc.bottom = spl;
       }
@@ -451,7 +451,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       HDC hdc = BeginPaint(hWnd, &ps);
       RECT rc;
       GetClientRect(hWnd, &rc);
-      const int spl = GetSplitterY();
+      const int spl = GetClampedSplitterY(cyClient);
       if (spl > 0) {
         rc.bottom = spl;
       }

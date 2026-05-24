@@ -22,8 +22,14 @@ void LayoutChildren(HWND parent);
 
 // Current splitter top-edge Y in parent client coordinates. Returns
 // -1 before the first layout, after which LayoutChildren keeps the
-// value clamped to [kMinPaneHeight, cy - kMinPaneHeight - kSplitterHeight].
+// value clamped to [kMinTopHeight, cy - kMinBottomHeight - kSplitterHeight].
 int GetSplitterY();
+
+// Same as GetSplitterY() but applies the same clamping that LayoutChildren
+// uses. Use this in paint handlers so the painted region matches where
+// the children actually are, avoiding unpainted strips.
+int GetClampedSplitterY(int cy);
+
 void SetSplitterY(int y);
 
 // Appends `msg` as a single line to the output edit, followed by a
