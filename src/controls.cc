@@ -284,9 +284,9 @@ bool CreateChildControls(HWND parent) {
   for (const wchar_t* opt : kThreadsOptions) {
     SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
   }
-  // Default to the first entry so the combos aren't blank at startup.
-  SendMessageW(hDigitsCombo, CB_SETCURSEL, 0, 0);
-  SendMessageW(hThreadsCombo, CB_SETCURSEL, 0, 0);
+  // Default selections: 1M digits (index 5), 2 threads (index 1).
+  SendMessageW(hDigitsCombo,  CB_SETCURSEL, 5, 0);
+  SendMessageW(hThreadsCombo, CB_SETCURSEL, 1, 0);
 
   return true;
 }

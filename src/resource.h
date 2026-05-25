@@ -14,6 +14,7 @@
 
 /* Dialogs */
 #define IDD_ABOUTDLG                130 // About Dialog
+#define IDD_CUSTOM_INPUT            131 // Custom digit/thread count input
 
 /* Menu items */
 #define IDM_ABOUT                   200
@@ -50,6 +51,8 @@
 #define IDC_CONTROLS_GROUP          612
 #define IDC_CLEARRESULT_BUTTON      613
 #define IDC_CLEAROUTPUT_BUTTON      614
+#define IDC_CUSTOM_PROMPT           615 // Static label in custom-input dialog
+#define IDC_CUSTOM_EDIT             616 // Edit control in custom-input dialog
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC

@@ -115,6 +115,19 @@ BEGIN
     DEFPUSHBUTTON   "OK", IDOK, 40, 45, 50, 14, WS_TABSTOP
 END
 
+// Custom value input dialog (used for "Custom" digit/thread combo selection)
+// Title and prompt label are set at runtime; position is set under the cursor.
+IDD_CUSTOM_INPUT DIALOGEX 0, 0, 140, 56
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION ""
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT           "", IDC_CUSTOM_PROMPT, 7, 7, 126, 8, SS_NOPREFIX
+    EDITTEXT        IDC_CUSTOM_EDIT, 7, 18, 126, 12, ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",     IDOK,     23, 36, 44, 14, WS_TABSTOP
+    PUSHBUTTON      "Cancel", IDCANCEL, 73, 36, 44, 14, WS_TABSTOP
+END
+
 // Version Information
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION MAJOR_VERSION, MINOR_VERSION, BUILD_VERSION

@@ -11,6 +11,38 @@
 #include "strings.h"
 
 // =========================================================================
+// Statics
+// =========================================================================
+
+// Previous non-"Custom" selection for each combo, used to revert when the
+// user cancels the custom-input dialog. Initialised to the startup defaults
+// (index 5 = "1M" for digits, index 1 = "2" for threads).
+static int  s_prev_digits_sel         = 5;
+static int  s_prev_threads_sel        = 1;
+static bool s_digits_custom_injected  = false;
+static bool s_threads_custom_injected = false;
+
+// Latched at startup from the .rc's initial GRAYED flag on IDM_CONSOLE.
+// When true, UpdateConsoleToggleMenu leaves the item alone (no enable,
+// no label swap) and the WM_COMMAND handler refuses to toggle - the
+// .rc gets the final say on whether the feature is available at all.
+static bool s_console_menu_user_disabled = false;
+
+// Our own view of whether the user has toggled the console hidden.
+// We can't use IsWindowVisible(GetConsoleWindow()) for this because on
+// Win10/11 with Windows Terminal as the default conhost, GetConsoleWindow
+// returns a permanently-hidden pseudo-window owned by conhost.exe - the
+// visible Terminal UI is a separate process. So IsWindowVisible says
+// "hidden" even though the user can see the console fine. Track intent
+// instead: wWinMain hides the console immediately at startup unless
+// --debug / --version / --help asked for it visible, and the flag flips
+// on every successful Show/HideConsole call after that.
+static bool s_console_hidden = false;
+
+// Whether window was minimized or not
+static bool s_was_minimized = false;
+
+// =========================================================================
 // Globals
 // =========================================================================
 
@@ -21,8 +53,8 @@ HWND hDigitsLabel  = nullptr;
 HWND hDigitsCombo  = nullptr;
 HWND hThreadsLabel = nullptr;
 HWND hThreadsCombo = nullptr;
-HWND hStartButton   = nullptr;
-HWND hStopButton    = nullptr;
+HWND hStartButton        = nullptr;
+HWND hStopButton         = nullptr;
 HWND hOpenOutButton      = nullptr;
 HWND hClearResultButton  = nullptr;
 HWND hClearOutputButton  = nullptr;
@@ -59,30 +91,10 @@ HICON kSmallIcon = nullptr;
 // Whether we have commctl32 5.82 (XP/I.E 6.0)
 bool can_use_582_controls = false;
 
-// Latched at startup from the .rc's initial GRAYED flag on IDM_CONSOLE.
-// When true, UpdateConsoleToggleMenu leaves the item alone (no enable,
-// no label swap) and the WM_COMMAND handler refuses to toggle - the
-// .rc gets the final say on whether the feature is available at all.
-static bool s_console_menu_user_disabled = false;
-
-// Our own view of whether the user has toggled the console hidden.
-// We can't use IsWindowVisible(GetConsoleWindow()) for this because on
-// Win10/11 with Windows Terminal as the default conhost, GetConsoleWindow
-// returns a permanently-hidden pseudo-window owned by conhost.exe - the
-// visible Terminal UI is a separate process. So IsWindowVisible says
-// "hidden" even though the user can see the console fine. Track intent
-// instead: wWinMain hides the console immediately at startup unless
-// --debug / --version / --help asked for it visible, and the flag flips
-// on every successful Show/HideConsole call after that.
-static bool s_console_hidden = false;
-
-// Whether window was minimized or not
-static bool s_was_minimized = false;
-
 COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE);
 
 // =========================================================================
-// Static forward declarations
+// Forward declarations
 // =========================================================================
 
 static bool ParseCommandLine(int argc, LPWSTR argv[]);
@@ -90,6 +102,16 @@ static int ShowVersionAndExit();
 static int ShowHelpAndExit();
 static void UpdateConsoleToggleMenu(HWND hWnd);
 static void ApplyMenuDefaults(HWND hWnd);
+
+// Params passed via DialogBoxParamW lParam for the custom-input dialog.
+struct CustomInputParams {
+  const wchar_t* title;
+  const wchar_t* prompt;
+  UINT           min_val;
+  UINT           max_val;
+  UINT           edit_limit;  // max characters the edit control accepts
+  UINT           result;      // written on IDOK
+};
 
 // =========================================================================
 // Functions
@@ -396,6 +418,69 @@ static void ApplyMenuDefaults(HWND hWnd) {
   g_colored_output = IsMenuChecked(menu, IDM_COLOREDOUTPUT);
 }
 
+static INT_PTR CALLBACK CustomInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+  switch (msg) {
+    case WM_INITDIALOG: {
+      auto* p = reinterpret_cast<CustomInputParams*>(lParam);
+      SetWindowLongPtrW(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(p));
+      SetWindowTextW(hDlg, p->title);
+      SetDlgItemTextW(hDlg, IDC_CUSTOM_PROMPT, p->prompt);
+      SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETLIMITTEXT, p->edit_limit, 0);
+      // Position the dialog just below the mouse cursor, clamped to screen.
+      POINT pt;
+      GetCursorPos(&pt);
+      RECT dr;
+      GetWindowRect(hDlg, &dr);
+      const int w  = dr.right  - dr.left;
+      const int h  = dr.bottom - dr.top;
+      const int sw = GetSystemMetrics(SM_CXSCREEN);
+      const int sh = GetSystemMetrics(SM_CYSCREEN);
+      int x = pt.x;
+      int y = pt.y + 4;  // slight offset so cursor doesn't overlap the title bar
+      if (x + w > sw) x = sw - w;
+      if (y + h > sh) y = sh - h;
+      if (x < 0) x = 0;
+      if (y < 0) y = 0;
+      SetWindowPos(hDlg, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+      SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
+      return FALSE;  // FALSE because we set focus manually
+    }
+    case WM_COMMAND: {
+      const int ctrl = LOWORD(wParam);
+      if (ctrl == IDOK) {
+        auto* p = reinterpret_cast<CustomInputParams*>(
+            GetWindowLongPtrW(hDlg, DWLP_USER));
+        wchar_t buf[32] = {};
+        GetDlgItemTextW(hDlg, IDC_CUSTOM_EDIT, buf, 32);
+        wchar_t* end = nullptr;
+        const unsigned long val = wcstoul(buf, &end, 10);
+        if (end == buf || *end != L'\0' || val < p->min_val || val > p->max_val) {
+          wchar_t errmsg[128];
+          swprintf(errmsg, 128, L"Enter a whole number between %u and %u.",
+                   p->min_val, p->max_val);
+          WarnBox(hDlg, p->title, errmsg);
+          SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
+          SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETSEL, 0, -1);
+          return TRUE;
+        }
+        p->result = static_cast<UINT>(val);
+        EndDialog(hDlg, IDOK);
+        return TRUE;
+      }
+      if (ctrl == IDCANCEL) {
+        EndDialog(hDlg, IDCANCEL);
+        return TRUE;
+      }
+      return FALSE;
+    }
+    case WM_CLOSE:
+      EndDialog(hDlg, IDCANCEL);
+      return TRUE;
+    default:
+      return FALSE;
+  }
+}
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
   switch (message) {
     case WM_CREATE:
@@ -523,12 +608,73 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           const int digits  = GetSelectedDigits();
           const int threads = GetSelectedThreads();
           if (digits < 0 || threads < 0) {
-            SendOutputMessage(L"Custom selection is not yet supported.");
-            StopCalculation();
+            WarnBox(hWnd, L"Invalid Selection",
+                    L"Please select a digit and thread count before calculating.");
             break;
           }
           if (!StartCalculation(digits, threads)) {
             SendOutputMessage(L"Could not start (already running?).");
+          }
+          break;
+        }
+        case IDC_DIGITS_COMBO:
+        case IDC_THREADS_COMBO: {
+          if (HIWORD(wParam) != CBN_SELCHANGE) break;
+          HWND hCombo            = reinterpret_cast<HWND>(lParam);
+          const bool is_digits   = (command == IDC_DIGITS_COMBO);
+          const int  count       = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
+          const int  sel         = static_cast<int>(SendMessageW(hCombo, CB_GETCURSEL, 0, 0));
+          if (sel == CB_ERR) break;
+          // "Custom" is always the last item; anything else just updates the
+          // previous-selection tracker so we know what to revert to on Cancel.
+          if (sel != count - 1) {
+            if (is_digits) s_prev_digits_sel  = sel;
+            else           s_prev_threads_sel = sel;
+            break;
+          }
+          // "Custom" was selected — show the input dialog.
+          CustomInputParams params = {};
+          if (is_digits) {
+            params.title      = L"Custom Digit Count";
+            params.prompt     = L"Enter number of digits:";
+            params.min_val    = kMinNumDigits;
+            params.max_val    = kMaxNumDigits;
+            params.edit_limit = 10;  // 1,000,000,000 = 10 digits
+          } else {
+            params.title      = L"Custom Thread Count";
+            params.prompt     = L"Enter number of threads:";
+            params.min_val    = kMinNumThreads;
+            params.max_val    = kMaxNumThreads;
+            params.edit_limit = 3;   // 256 = 3 digits
+          }
+          const INT_PTR res = DialogBoxParamW(
+              g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOM_INPUT),
+              hWnd, CustomInputDlgProc, reinterpret_cast<LPARAM>(&params));
+          if (res == IDOK) {
+            // Format the validated value and inject it just before "Custom".
+            wchar_t val_str[32];
+            swprintf(val_str, 32, L"%u", params.result);
+            // Remove any previously injected custom item (always at count-2
+            // when injected == true, because "Custom" stays last).
+            bool& injected = is_digits ? s_digits_custom_injected
+                                       : s_threads_custom_injected;
+            if (injected) {
+              const int cur_count = static_cast<int>(
+                  SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
+              SendMessageW(hCombo, CB_DELETESTRING, cur_count - 2, 0);
+            }
+            const int insert_at = static_cast<int>(
+                SendMessageW(hCombo, CB_GETCOUNT, 0, 0)) - 1;
+            SendMessageW(hCombo, CB_INSERTSTRING, insert_at,
+                         reinterpret_cast<LPARAM>(val_str));
+            SendMessageW(hCombo, CB_SETCURSEL, insert_at, 0);
+            injected = true;
+            if (is_digits) s_prev_digits_sel  = insert_at;
+            else           s_prev_threads_sel = insert_at;
+          } else {
+            // Revert to the last known good selection.
+            const int prev = is_digits ? s_prev_digits_sel : s_prev_threads_sel;
+            if (prev >= 0) SendMessageW(hCombo, CB_SETCURSEL, prev, 0);
           }
           break;
         }

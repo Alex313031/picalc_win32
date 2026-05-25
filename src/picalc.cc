@@ -393,7 +393,7 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
     const DWORD sqrt_wait_ms = GetTickCount() - t_bs_end;
     if (sqrt_wait_ms > 0) {
       std::wostringstream m;
-      m << L"Waited " << (sqrt_wait_ms / 1000.0) << L"s. for sqrt(10005)";
+      m << L"Parallel sqrt: " << (sqrt_wait_ms / 1000.0) << L"s.";
       EmitLine(m.str(), false);
     }
   } else {
