@@ -28,9 +28,9 @@ int GetSplitterY();
 // Same as GetSplitterY() but applies the same clamping that LayoutChildren
 // uses. Use this in paint handlers so the painted region matches where
 // the children actually are, avoiding unpainted strips.
-int GetClampedSplitterY(int cy);
+int GetClampedSplitterY(int client_h);
 
-void SetSplitterY(int y);
+void SetSplitterY(int new_y);
 
 // Appends `msg` as a single line to the output edit, followed by a
 // CRLF so the next call starts on a fresh line. Text is passed

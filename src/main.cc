@@ -187,8 +187,8 @@ static bool ParseCommandLine(int argc, LPWSTR argv[]) {
   // argv[0] is the .exe path (CommandLineToArgvW convention); skip it so
   // a path containing characters that happen to match a flag literal
   // can't false-trigger one of the wcscmp checks below.
-  for (int i = 1; i < argc; ++i) {
-    wchar_t* arg = argv[i];
+  for (int arg_idx = 1; arg_idx < argc; ++arg_idx) {
+    wchar_t* arg = argv[arg_idx];
     is_debug_mode |= (wcscmp(arg, L"--debug") == 0) || (wcscmp(arg, L"-d") == 0) ||
                      (wcscmp(arg, L"-debug") == 0) || (wcscmp(arg, L"/d") == 0) ||
                      (wcscmp(arg, L"/D") == 0);
@@ -421,49 +421,49 @@ static void ApplyMenuDefaults(HWND hWnd) {
 static INT_PTR CALLBACK CustomInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
     case WM_INITDIALOG: {
-      auto* p = reinterpret_cast<CustomInputParams*>(lParam);
-      SetWindowLongPtrW(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(p));
-      SetWindowTextW(hDlg, p->title);
-      SetDlgItemTextW(hDlg, IDC_CUSTOM_PROMPT, p->prompt);
-      SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETLIMITTEXT, p->edit_limit, 0);
+      auto* params = reinterpret_cast<CustomInputParams*>(lParam);
+      SetWindowLongPtrW(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(params));
+      SetWindowTextW(hDlg, params->title);
+      SetDlgItemTextW(hDlg, IDC_CUSTOM_PROMPT, params->prompt);
+      SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETLIMITTEXT, params->edit_limit, 0);
       // Position the dialog just below the mouse cursor, clamped to screen.
-      POINT pt;
-      GetCursorPos(&pt);
-      RECT dr;
-      GetWindowRect(hDlg, &dr);
-      const int w  = dr.right  - dr.left;
-      const int h  = dr.bottom - dr.top;
-      const int sw = GetSystemMetrics(SM_CXSCREEN);
-      const int sh = GetSystemMetrics(SM_CYSCREEN);
-      int x = pt.x;
-      int y = pt.y + 4;  // slight offset so cursor doesn't overlap the title bar
-      if (x + w > sw) x = sw - w;
-      if (y + h > sh) y = sh - h;
-      if (x < 0) x = 0;
-      if (y < 0) y = 0;
-      SetWindowPos(hDlg, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+      POINT cursor_pt;
+      GetCursorPos(&cursor_pt);
+      RECT dlg_rect;
+      GetWindowRect(hDlg, &dlg_rect);
+      const int dlg_w   = dlg_rect.right  - dlg_rect.left;
+      const int dlg_h   = dlg_rect.bottom - dlg_rect.top;
+      const int screen_w = GetSystemMetrics(SM_CXSCREEN);
+      const int screen_h = GetSystemMetrics(SM_CYSCREEN);
+      int dlg_x = cursor_pt.x;
+      int dlg_y = cursor_pt.y + 4;  // slight offset so cursor doesn't overlap the title bar
+      if (dlg_x + dlg_w > screen_w) dlg_x = screen_w - dlg_w;
+      if (dlg_y + dlg_h > screen_h) dlg_y = screen_h - dlg_h;
+      if (dlg_x < 0) dlg_x = 0;
+      if (dlg_y < 0) dlg_y = 0;
+      SetWindowPos(hDlg, nullptr, dlg_x, dlg_y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
       SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
       return FALSE;  // FALSE because we set focus manually
     }
     case WM_COMMAND: {
       const int ctrl = LOWORD(wParam);
       if (ctrl == IDOK) {
-        auto* p = reinterpret_cast<CustomInputParams*>(
+        auto* params = reinterpret_cast<CustomInputParams*>(
             GetWindowLongPtrW(hDlg, DWLP_USER));
         wchar_t buf[32] = {};
         GetDlgItemTextW(hDlg, IDC_CUSTOM_EDIT, buf, 32);
         wchar_t* end = nullptr;
         const unsigned long val = wcstoul(buf, &end, 10);
-        if (end == buf || *end != L'\0' || val < p->min_val || val > p->max_val) {
+        if (end == buf || *end != L'\0' || val < params->min_val || val > params->max_val) {
           wchar_t errmsg[128];
           swprintf(errmsg, 128, L"Enter a whole number between %u and %u.",
-                   p->min_val, p->max_val);
-          WarnBox(hDlg, p->title, errmsg);
+                   params->min_val, params->max_val);
+          WarnBox(hDlg, params->title, errmsg);
           SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
           SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETSEL, 0, -1);
           return TRUE;
         }
-        p->result = static_cast<UINT>(val);
+        params->result = static_cast<UINT>(val);
         EndDialog(hDlg, IDOK);
         return TRUE;
       }
@@ -511,13 +511,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // which is already clipped to the groupbox rect, so FillRect lands
       // exactly where the groupbox background needs it.
       HDC hdc = reinterpret_cast<HDC>(wParam);
-      RECT rc;
-      GetClientRect(hWnd, &rc);
+      RECT client_rc;
+      GetClientRect(hWnd, &client_rc);
       const int spl = GetClampedSplitterY(cyClient);
       if (spl > 0) {
-        rc.bottom = spl;
+        client_rc.bottom = spl;
       }
-      FillRectWithColor(hdc, rc, g_bkg_color);
+      FillRectWithColor(hdc, client_rc, g_bkg_color);
       return TRUE;
     }
     case WM_GETMINMAXINFO: {
@@ -534,13 +534,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
-      RECT rc;
-      GetClientRect(hWnd, &rc);
+      RECT client_rc;
+      GetClientRect(hWnd, &client_rc);
       const int spl = GetClampedSplitterY(cyClient);
       if (spl > 0) {
-        rc.bottom = spl;
+        client_rc.bottom = spl;
       }
-      FillRectWithColor(hdc, rc, g_bkg_color);
+      FillRectWithColor(hdc, client_rc, g_bkg_color);
       EndPaint(hWnd, &ps);
       break;
     }

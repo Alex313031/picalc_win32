@@ -78,8 +78,8 @@ struct PQT {
 };
 
 struct BSArgs {
-  int a;
-  int b;
+  int lo;
+  int hi;
   int depth;
   PQT result;
 };
@@ -110,9 +110,9 @@ DWORD g_calc_start_tick = 0; // Captured by CalcThreadProc
 void ResetMergeProgress(int start_depth) {
   g_start_depth = start_depth;
   g_total_depth = g_start_depth + 1;
-  for (int i = 0; i < kMaxMergeLevels; ++i) {
-    g_combines_at_level[i].store(0, std::memory_order_relaxed);
-    g_level_start_tick[i].store(0, std::memory_order_relaxed);
+  for (int level_idx = 0; level_idx < kMaxMergeLevels; ++level_idx) {
+    g_combines_at_level[level_idx].store(0, std::memory_order_relaxed);
+    g_level_start_tick[level_idx].store(0, std::memory_order_relaxed);
   }
 }
 
@@ -132,18 +132,18 @@ void NoteCombineComplete(int depth) {
   }
   if (count == expected) {
     const DWORD level_ms = GetTickCount() - g_level_start_tick[depth].load(std::memory_order_acquire);
-    std::wostringstream m;
-    m << L"Merge level " << depth << L" of " << g_total_depth << L" done ("
-      << expected << L" mpf combines, " << (level_ms / 1000.0) << L"s.)";
-    EmitLine(m.str(), false);
+    std::wostringstream line;
+    line << L"Merge level " << depth << L" of " << g_total_depth << L" done ("
+         << expected << L" mpf combines, " << (level_ms / 1000.0) << L"s.)";
+    EmitLine(line.str(), false);
   }
 }
 
-void BinarySplitParallel(int a, int b, int depth, PQT* out);
+void BinarySplitParallel(int lo, int hi, int depth, PQT* out);
 
-DWORD WINAPI BSWorker(LPVOID lp) {
-  BSArgs* args = static_cast<BSArgs*>(lp);
-  BinarySplitParallel(args->a, args->b, args->depth, &args->result);
+DWORD WINAPI BSWorker(LPVOID thread_param) {
+  BSArgs* args = static_cast<BSArgs*>(thread_param);
+  BinarySplitParallel(args->lo, args->hi, args->depth, &args->result);
   return 0;
 }
 
@@ -154,8 +154,8 @@ struct SqrtArgs {
   mpf_class sqrt_result;  // Constructed at the calling thread's default precision.
 };
 
-DWORD WINAPI SqrtWorker(LPVOID lp) {
-  SqrtArgs* args = static_cast<SqrtArgs*>(lp);
+DWORD WINAPI SqrtWorker(LPVOID thread_param) {
+  SqrtArgs* args = static_cast<SqrtArgs*>(thread_param);
   mpf_sqrt_ui(args->sqrt_result.get_mpf_t(), 10005);
   return 0;
 }
@@ -163,14 +163,14 @@ DWORD WINAPI SqrtWorker(LPVOID lp) {
 // One mpz multiplication on its own thread, used by Combine() to do the
 // four products in a BS combine in parallel rather than sequentially.
 struct MulArgs {
-  const mpz_class* a;
-  const mpz_class* b;
+  const mpz_class* lhs;
+  const mpz_class* rhs;
   mpz_class result;
 };
 
-DWORD WINAPI MulWorker(LPVOID lp) {
-  MulArgs* args = static_cast<MulArgs*>(lp);
-  args->result  = (*args->a) * (*args->b);
+DWORD WINAPI MulWorker(LPVOID thread_param) {
+  MulArgs* args = static_cast<MulArgs*>(thread_param);
+  args->result  = (*args->lhs) * (*args->rhs);
   return 0;
 }
 
@@ -184,35 +184,35 @@ DWORD WINAPI MulWorker(LPVOID lp) {
 // Below the threshold the products are cheap enough that thread
 // creation overhead (~100us on Win32) would outweigh the savings, so
 // we keep the original serial path for those.
-void Combine(const PQT& L, const PQT& R, PQT* out) {
+void Combine(const PQT& left_pqt, const PQT& right_pqt, PQT* out) {
   constexpr size_t kParallelMulThresholdLimbs = 8000;  // ~64KB at 8B/limb
   const bool parallelize =
-      mpz_size(L.P.get_mpz_t()) > kParallelMulThresholdLimbs ||
-      mpz_size(L.T.get_mpz_t()) > kParallelMulThresholdLimbs;
+      mpz_size(left_pqt.P.get_mpz_t()) > kParallelMulThresholdLimbs ||
+      mpz_size(left_pqt.T.get_mpz_t()) > kParallelMulThresholdLimbs;
   if (!parallelize) {
-    out->P = L.P * R.P;
-    out->Q = L.Q * R.Q;
-    out->T = R.Q * L.T + L.P * R.T;
+    out->P = left_pqt.P * right_pqt.P;
+    out->Q = left_pqt.Q * right_pqt.Q;
+    out->T = right_pqt.Q * left_pqt.T + left_pqt.P * right_pqt.T;
     return;
   }
   MulArgs muls[3] = {
-      {&L.P, &R.P, {}},  // P_out = L.P * R.P
-      {&L.Q, &R.Q, {}},  // Q_out = L.Q * R.Q
-      {&R.Q, &L.T, {}},  // T_left = R.Q * L.T
+      {&left_pqt.P, &right_pqt.P, {}},  // P_out = left_pqt.P * right_pqt.P
+      {&left_pqt.Q, &right_pqt.Q, {}},  // Q_out = left_pqt.Q * right_pqt.Q
+      {&right_pqt.Q, &left_pqt.T, {}},  // T_left = right_pqt.Q * left_pqt.T
   };
   HANDLE handles[3] = {nullptr, nullptr, nullptr};
-  for (int i = 0; i < 3; ++i) {
-    handles[i] = CreateThread(nullptr, 0, MulWorker, &muls[i], 0, nullptr);
+  for (int mul_idx = 0; mul_idx < 3; ++mul_idx) {
+    handles[mul_idx] = CreateThread(nullptr, 0, MulWorker, &muls[mul_idx], 0, nullptr);
   }
   // Fourth mul on the current thread so we don't waste it blocking.
-  mpz_class t_right = L.P * R.T;
-  for (int i = 0; i < 3; ++i) {
-    if (handles[i] == nullptr) {
+  mpz_class t_right = left_pqt.P * right_pqt.T;
+  for (int mul_idx = 0; mul_idx < 3; ++mul_idx) {
+    if (handles[mul_idx] == nullptr) {
       // CreateThread failed - do this one inline too.
-      muls[i].result = (*muls[i].a) * (*muls[i].b);
+      muls[mul_idx].result = (*muls[mul_idx].lhs) * (*muls[mul_idx].rhs);
     } else {
-      WaitForSingleObject(handles[i], INFINITE);
-      CloseHandle(handles[i]);
+      WaitForSingleObject(handles[mul_idx], INFINITE);
+      CloseHandle(handles[mul_idx]);
     }
   }
   out->P = std::move(muls[0].result);
@@ -228,12 +228,12 @@ void Combine(const PQT& L, const PQT& R, PQT* out) {
 //
 // The stop check at the top of every call means cancellation reaches
 // us at the next call boundary (i.e. after the current mpz multiply).
-void BinarySplitParallel(int a, int b, int depth, PQT* out) {
+void BinarySplitParallel(int lo, int hi, int depth, PQT* out) {
   if (StopRequested()) {
     return;
   }
-  if (b - a == 1) {
-    if (a == 0) {
+  if (hi - lo == 1) {
+    if (lo == 0) {
       out->P = 1;
       out->Q = 1;
       out->T = kChudA;
@@ -243,37 +243,37 @@ void BinarySplitParallel(int a, int b, int depth, PQT* out) {
     //   P_k = -(6k-5)(2k-1)(6k-1)
     //   Q_k = k^3 * C^3 / 24            (C = 640320)
     //   T_k = (A + B*k) * P_k
-    out->P = mpz_class(2 * a - 1) * (6 * a - 1) * (6 * a - 5);
+    out->P = mpz_class(2 * lo - 1) * (6 * lo - 1) * (6 * lo - 5);
     out->P = -out->P;
-    const mpz_class c = kChudC;
-    out->Q = mpz_class(a) * a * a * c * c * c / 24;
-    out->T = (mpz_class(a) * kChudB + kChudA) * out->P;
+    const mpz_class chud_c = kChudC;
+    out->Q = mpz_class(lo) * lo * lo * chud_c * chud_c * chud_c / 24;
+    out->T = (mpz_class(lo) * kChudB + kChudA) * out->P;
     return;
   }
-  const int m = (a + b) / 2;
-  PQT R;
-  BSArgs left_args = {a, m, depth - 1, {}};
-  HANDLE h         = nullptr;
+  const int mid = (lo + hi) / 2;
+  PQT right_pqt;
+  BSArgs left_args       = {lo, mid, depth - 1, {}};
+  HANDLE thread_handle   = nullptr;
   if (depth > 0) {
-    h = CreateThread(nullptr, 0, BSWorker, &left_args, 0, nullptr);
+    thread_handle = CreateThread(nullptr, 0, BSWorker, &left_args, 0, nullptr);
   }
-  if (h != nullptr) {
+  if (thread_handle != nullptr) {
     // Left runs on the worker, right runs here. Both progress in
     // parallel; we rejoin via WaitForSingleObject before the combine.
-    BinarySplitParallel(m, b, depth - 1, &R);
-    WaitForSingleObject(h, INFINITE);
-    CloseHandle(h);
+    BinarySplitParallel(mid, hi, depth - 1, &right_pqt);
+    WaitForSingleObject(thread_handle, INFINITE);
+    CloseHandle(thread_handle);
   } else {
     // Budget exhausted (or CreateThread failed): both subtrees inline.
-    BinarySplitParallel(a, m, 0, &left_args.result);
-    BinarySplitParallel(m, b, 0, &R);
+    BinarySplitParallel(lo, mid, 0, &left_args.result);
+    BinarySplitParallel(mid, hi, 0, &right_pqt);
   }
   // Standard BS combine, but with the four products parallelised on
   // large operands. See Combine() for the size threshold and rationale.
-  //   P(a,b) = P(a,m) * P(m,b)
-  //   Q(a,b) = Q(a,m) * Q(m,b)
-  //   T(a,b) = Q(m,b) * T(a,m) + P(a,m) * T(m,b)
-  Combine(left_args.result, R, out);
+  //   P(lo,hi) = P(lo,mid) * P(mid,hi)
+  //   Q(lo,hi) = Q(lo,mid) * Q(mid,hi)
+  //   T(lo,hi) = Q(mid,hi) * T(lo,mid) + P(lo,mid) * T(mid,hi)
+  Combine(left_args.result, right_pqt, out);
   NoteCombineComplete(depth);
 }
 
@@ -320,8 +320,8 @@ std::wstring FormatPi(const mpf_class& pi, int digits, int maxDigits) {
 // Orchestrator
 // =========================================================================
 
-DWORD WINAPI CalcThreadProc(LPVOID lp) {
-  CalcArgs* outer  = static_cast<CalcArgs*>(lp);
+DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
+  CalcArgs* outer  = static_cast<CalcArgs*>(thread_param);
   const int digits = outer->digits;
   int threads      = outer->threads;
   delete outer;
@@ -332,16 +332,16 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   WriteSeparatorToResultFile();
 
   // Timestamp line, then banner: "Started Calculating N digits (Threads: T)".
-  SYSTEMTIME st;
-  GetLocalTime(&st);
-  const WORD   h12  = (st.wHour % 12 == 0) ? 12 : st.wHour % 12;
-  const wchar_t* ampm = (st.wHour < 12) ? L"AM" : L"PM";
-  wchar_t ts[32];
-  swprintf(ts, 32, L"%02u/%02u/%02u %02u:%02u:%02u %ls",
-           st.wMonth, st.wDay, st.wYear % 100,
-           h12, st.wMinute, st.wSecond, ampm);
-  EmitLine(ts, false);
-  WriteLineToResultFile(ts);
+  SYSTEMTIME local_time;
+  GetLocalTime(&local_time);
+  const WORD   hour_12  = (local_time.wHour % 12 == 0) ? 12 : local_time.wHour % 12;
+  const wchar_t* ampm = (local_time.wHour < 12) ? L"AM" : L"PM";
+  wchar_t timestamp_buf[32];
+  swprintf(timestamp_buf, 32, L"%02u/%02u/%02u %02u:%02u:%02u %ls",
+           local_time.wMonth, local_time.wDay, local_time.wYear % 100,
+           hour_12, local_time.wMinute, local_time.wSecond, ampm);
+  EmitLine(timestamp_buf, false);
+  WriteLineToResultFile(timestamp_buf);
   std::wostringstream banner;
   banner << kCalculateMessage << digits << L" digits (Threads: " << threads << L")";
   EmitLine(banner.str(), false);
@@ -362,12 +362,12 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   SqrtArgs sqrt_args;
   HANDLE sqrt_handle = CreateThread(nullptr, 0, SqrtWorker, &sqrt_args, 0, nullptr);
 
-  int N = static_cast<int>(digits / kDigitsPerTerm) + 1;
-  if (N < 1) {
-    N = 1;
+  int num_terms = static_cast<int>(digits / kDigitsPerTerm) + 1;
+  if (num_terms < 1) {
+    num_terms = 1;
   }
-  if (N < threads) {
-    threads = N;  // No point allowing more threads than there are terms.
+  if (num_terms < threads) {
+    threads = num_terms;  // No point allowing more threads than there are terms.
   }
 
   // Pick the smallest depth that gives us >= `threads` leaf subtrees.
@@ -382,7 +382,7 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   ResetMergeProgress(depth);
 
   PQT total;
-  BinarySplitParallel(0, N, depth, &total);
+  BinarySplitParallel(0, num_terms, depth, &total);
   const DWORD t_bs_end = GetTickCount();
 
   // Rejoin the parallel sqrt. Log the wait (or inline cost) as its own
@@ -392,23 +392,23 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
     CloseHandle(sqrt_handle);
     const DWORD sqrt_wait_ms = GetTickCount() - t_bs_end;
     if (sqrt_wait_ms > 0) {
-      std::wostringstream m;
-      m << L"Parallel sqrt: " << (sqrt_wait_ms / 1000.0) << L"s.";
-      EmitLine(m.str(), false);
+      std::wostringstream line;
+      line << L"Parallel sqrt: " << (sqrt_wait_ms / 1000.0) << L"s.";
+      EmitLine(line.str(), false);
     }
   } else {
     // CreateThread failed — run sqrt inline and log it as a stage.
     const DWORD sq_start = GetTickCount();
     mpf_sqrt_ui(sqrt_args.sqrt_result.get_mpf_t(), 10005);
-    std::wostringstream m;
-    m << L"sqrt(10005): " << ((GetTickCount() - sq_start) / 1000.0) << L"s.";
-    EmitLine(m.str(), false);
+    std::wostringstream line;
+    line << L"sqrt(10005): " << ((GetTickCount() - sq_start) / 1000.0) << L"s.";
+    EmitLine(line.str(), false);
   }
 
   if (StopRequested()) {
-    std::wostringstream m;
-    m << kStoppedMessage << digits << L" digits.";
-    EmitLine(m.str(), false);
+    std::wostringstream stop_line;
+    stop_line << kStoppedMessage << digits << L" digits.";
+    EmitLine(stop_line.str(), false);
     g_running = false;
     return 0;
   }
@@ -424,11 +424,11 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   const mpf_class pi = (sqrt_args.sqrt_result * q_f * kPiCoeff) / t_f;
   {
     const DWORD elapsed = GetTickCount() - mpf_start;
-    std::wostringstream m;
-    m << L"Merge level " << g_total_depth << L" of " << g_total_depth
-      << L" done (1 mpf divide, " << (elapsed / 1000.0) << L"s.)";
-    EmitLine(m.str(), false);
-    WriteLineToResultFile(m.str());
+    std::wostringstream line;
+    line << L"Merge level " << g_total_depth << L" of " << g_total_depth
+         << L" done (1 mpf divide, " << (elapsed / 1000.0) << L"s.)";
+    EmitLine(line.str(), false);
+    WriteLineToResultFile(line.str());
   }
   // Capture t_end immediately after the pi value is computed, before any
   // EmitLine calls (which cross thread boundaries and add UI latency).
@@ -437,15 +437,15 @@ DWORD WINAPI CalcThreadProc(LPVOID lp) {
   const DWORD elapsedMs = t_end - t_start;
 
   if (StopRequested()) {
-    std::wostringstream m;
-    m << kStoppedMessage << digits << L" digits.";
-    EmitLine(m.str(), false);
+    std::wostringstream stop_line;
+    stop_line << kStoppedMessage << digits << L" digits.";
+    EmitLine(stop_line.str(), false);
     g_running = false;
     return 0;
   }
 
   std::wostringstream iter_line;
-  iter_line << kIterMessage << N;
+  iter_line << kIterMessage << num_terms;
   EmitLine(iter_line.str(), false);
   WriteLineToResultFile(iter_line.str());
   std::wostringstream time_line;

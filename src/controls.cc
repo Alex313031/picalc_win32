@@ -40,14 +40,14 @@ static LRESULT CALLBACK SplitterProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
       }
       // lParam is in splitter-local client coords; translate to parent
       // client coords so we can store the absolute splitter top edge.
-      POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+      POINT mouse_pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
       HWND parent = GetParent(hWnd);
       if (parent == nullptr) {
         return 0;
       }
-      ClientToScreen(hWnd, &pt);
-      ScreenToClient(parent, &pt);
-      s_splitter_y = pt.y;
+      ClientToScreen(hWnd, &mouse_pt);
+      ScreenToClient(parent, &mouse_pt);
+      s_splitter_y = mouse_pt.y;
       LayoutChildren(parent);
       return 0;
     }
@@ -61,20 +61,20 @@ static LRESULT CALLBACK SplitterProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
-      RECT rc;
-      GetClientRect(hWnd, &rc);
+      RECT splitter_rc;
+      GetClientRect(hWnd, &splitter_rc);
       // Classic button-face fill with a 1px raised top + bottom edge so
       // the bar is visible against the surrounding grey without looking
       // like a heavyweight 3D bevel.
-      FillRectWithColor(hdc, rc, g_bkg_color);
-      DrawEdge(hdc, &rc, EDGE_RAISED, BF_TOP | BF_BOTTOM);
+      FillRectWithColor(hdc, splitter_rc, g_bkg_color);
+      DrawEdge(hdc, &splitter_rc, EDGE_RAISED, BF_TOP | BF_BOTTOM);
       // Grab handle: 1px tall, 6px wide, centered in the bar.
-      const int cx      = rc.right - rc.left;
-      const int cy      = rc.bottom - rc.top;
-      const int hndl_x  = rc.left + (cx - kSplitterHandleWidth) / 2;
-      const int hndl_y  = rc.top  + (cy - kSplitterHandleHeight) / 2;
-      const RECT handle = {hndl_x, hndl_y,
-                           hndl_x + kSplitterHandleWidth, hndl_y + kSplitterHandleHeight};
+      const int splitter_w = splitter_rc.right - splitter_rc.left;
+      const int splitter_h = splitter_rc.bottom - splitter_rc.top;
+      const int hndl_x     = splitter_rc.left + (splitter_w - kSplitterHandleWidth) / 2;
+      const int hndl_y     = splitter_rc.top  + (splitter_h - kSplitterHandleHeight) / 2;
+      const RECT handle    = {hndl_x, hndl_y,
+                              hndl_x + kSplitterHandleWidth, hndl_y + kSplitterHandleHeight};
       FillRectWithColor(hdc, handle, kSplitterHandleColor);
       EndPaint(hWnd, &ps);
       return 0;
@@ -90,15 +90,15 @@ bool RegisterSplitterClass(HINSTANCE hInstance) {
   // back the original ATOM for a duplicate-but-identical registration
   // would be 0 with GetLastError = ERROR_CLASS_ALREADY_EXISTS. Treat
   // that as success so this function stays idempotent.
-  WNDCLASSEXW wc = {};
-  wc.cbSize        = sizeof(wc);
-  wc.style         = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc   = SplitterProc;
-  wc.hInstance     = hInstance;
-  wc.hCursor       = LoadCursorW(nullptr, IDC_SIZENS);
-  wc.hbrBackground = nullptr; // We paint in WM_PAINT
-  wc.lpszClassName = kSplitterClassName;
-  if (RegisterClassExW(&wc) != 0) {
+  WNDCLASSEXW wnd_class = {};
+  wnd_class.cbSize        = sizeof(wnd_class);
+  wnd_class.style         = CS_HREDRAW | CS_VREDRAW;
+  wnd_class.lpfnWndProc   = SplitterProc;
+  wnd_class.hInstance     = hInstance;
+  wnd_class.hCursor       = LoadCursorW(nullptr, IDC_SIZENS);
+  wnd_class.hbrBackground = nullptr; // We paint in WM_PAINT
+  wnd_class.lpszClassName = kSplitterClassName;
+  if (RegisterClassExW(&wnd_class) != 0) {
     return true;
   }
   return GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
@@ -295,20 +295,20 @@ int GetSplitterY() {
   return s_splitter_y;
 }
 
-int GetClampedSplitterY(int cy) {
+int GetClampedSplitterY(int client_h) {
   if (s_splitter_y < 0) {
-    return static_cast<int>(static_cast<float>(cy) * kTopPaneFraction);
+    return static_cast<int>(static_cast<float>(client_h) * kTopPaneFraction);
   }
   const int min_y = kMinTopHeight;
-  const int max_y = cy - kMinBottomHeight - kSplitterHeight;
+  const int max_y = client_h - kMinBottomHeight - kSplitterHeight;
   if (max_y < min_y) return min_y;
   if (s_splitter_y < min_y) return min_y;
   if (s_splitter_y > max_y) return max_y;
   return s_splitter_y;
 }
 
-void SetSplitterY(int y) {
-  s_splitter_y = y;
+void SetSplitterY(int new_y) {
+  s_splitter_y = new_y;
 }
 
 void LayoutChildren(HWND parent) {
@@ -316,24 +316,24 @@ void LayoutChildren(HWND parent) {
       s_hGroupBox == nullptr) {
     return;
   }
-  RECT rc;
-  GetClientRect(parent, &rc);
-  const int cx = rc.right - rc.left;
-  const int cy = rc.bottom - rc.top;
-  if (cx <= 0 || cy <= 0) {
+  RECT client_rc;
+  GetClientRect(parent, &client_rc);
+  const int client_w = client_rc.right - client_rc.left;
+  const int client_h = client_rc.bottom - client_rc.top;
+  if (client_w <= 0 || client_h <= 0) {
     return;
   }
   // kTopPaneFraction is 0.5 truncated to int at the end since
   // the splitter Y is a pixel value.
   if (s_splitter_y < 0) {
-    s_splitter_y = static_cast<int>(static_cast<float>(cy) * kTopPaneFraction);
+    s_splitter_y = static_cast<int>(static_cast<float>(client_h) * kTopPaneFraction);
   }
   // Clamp into a local for layout; don't write back to s_splitter_y.
   // Otherwise shrinking the window past the user's splitter Y would
   // overwrite their preference, so growing the window again wouldn't
   // restore the original position.
   const int min_y = kMinTopHeight;
-  const int max_y = cy - kMinBottomHeight - kSplitterHeight;
+  const int max_y = client_h - kMinBottomHeight - kSplitterHeight;
   int splitter_top = s_splitter_y;
   if (max_y < min_y) {
     // Window is too small for both panes + splitter at minimum
@@ -369,12 +369,12 @@ void LayoutChildren(HWND parent) {
   }
   if (hdwp != nullptr) {
     hdwp = DeferWindowPos(hdwp, hSplitter, nullptr,
-                          0, splitter_top, cx, kSplitterHeight,
+                          0, splitter_top, client_w, kSplitterHeight,
                           SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (hdwp != nullptr) {
     hdwp = DeferWindowPos(hdwp, hOutputEdit, nullptr,
-                          0, bottom_top, cx, bottom_h,
+                          0, bottom_top, client_w, bottom_h,
                           SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (hdwp != nullptr) {
@@ -395,18 +395,18 @@ void LayoutChildren(HWND parent) {
 static std::wstring NormalizeNewlines(const std::wstring& msg) {
   std::wstring out;
   out.reserve(msg.size() + 8);
-  for (size_t i = 0; i < msg.size(); ++i) {
-    const wchar_t c = msg[i];
-    if (c == L'\r') {
+  for (size_t char_idx = 0; char_idx < msg.size(); ++char_idx) {
+    const wchar_t ch = msg[char_idx];
+    if (ch == L'\r') {
       out += L"\r\n";
       // Eat a paired \n so \r\n doesn't become \r\n\r\n.
-      if (i + 1 < msg.size() && msg[i + 1] == L'\n') {
-        ++i;
+      if (char_idx + 1 < msg.size() && msg[char_idx + 1] == L'\n') {
+        ++char_idx;
       }
-    } else if (c == L'\n') {
+    } else if (ch == L'\n') {
       out += L"\r\n";
     } else {
-      out += c;
+      out += ch;
     }
   }
   return out;
@@ -472,13 +472,13 @@ static int ParseCountSuffixed(const std::wstring& s) {
   }
   long val = 0;
   wchar_t suf = 0;
-  for (wchar_t c : s) {
-    if (c >= L'0' && c <= L'9') {
-      val = val * 10 + (c - L'0');
-    } else if (c == L',') {
+  for (wchar_t ch : s) {
+    if (ch >= L'0' && ch <= L'9') {
+      val = val * 10 + (ch - L'0');
+    } else if (ch == L',') {
       // skip thousands separators
     } else {
-      suf = c;
+      suf = ch;
       break;
     }
   }

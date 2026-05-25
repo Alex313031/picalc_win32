@@ -101,17 +101,17 @@ bool SaveClientBitmap(HWND hWnd, std::wstring* outSavedPath) {
   }
 
   // ---- Read out the snapshot pixels in BMP-friendly format. ----
-  BITMAPINFOHEADER bi = {};
-  bi.biSize           = sizeof(BITMAPINFOHEADER);
-  bi.biWidth          = width;
-  bi.biHeight         = height;
-  bi.biPlanes         = 1;
-  bi.biBitCount       = 32;
-  bi.biCompression    = BI_RGB;
-  bi.biSizeImage      = static_cast<DWORD>(width * height * 4);
-  std::vector<BYTE> pixels(bi.biSizeImage);
+  BITMAPINFOHEADER bmp_info = {};
+  bmp_info.biSize           = sizeof(BITMAPINFOHEADER);
+  bmp_info.biWidth          = width;
+  bmp_info.biHeight         = height;
+  bmp_info.biPlanes         = 1;
+  bmp_info.biBitCount       = 32;
+  bmp_info.biCompression    = BI_RGB;
+  bmp_info.biSizeImage      = static_cast<DWORD>(width * height * 4);
+  std::vector<BYTE> pixels(bmp_info.biSizeImage);
   const int scan_lines = GetDIBits(hdc_snap, hbm_snap, 0, static_cast<UINT>(height), pixels.data(),
-                                   reinterpret_cast<BITMAPINFO*>(&bi), DIB_RGB_COLORS);
+                                   reinterpret_cast<BITMAPINFO*>(&bmp_info), DIB_RGB_COLORS);
 
   // Drop the snapshot's GDI handles before file I/O so we don't hold them
   // across a slow CreateFile / WriteFile.
@@ -124,20 +124,20 @@ bool SaveClientBitmap(HWND hWnd, std::wstring* outSavedPath) {
   }
 
   // ---- Write the BMP file. ----
-  const DWORD pixelDataOffset = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-  BITMAPFILEHEADER bf         = {};
-  bf.bfType                   = 0x4D42; // 'BM' signature
-  bf.bfSize                   = pixelDataOffset + bi.biSizeImage;
-  bf.bfOffBits                = pixelDataOffset;
+  const DWORD pixelDataOffset  = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+  BITMAPFILEHEADER bmp_file_hdr = {};
+  bmp_file_hdr.bfType          = 0x4D42; // 'BM' signature
+  bmp_file_hdr.bfSize          = pixelDataOffset + bmp_info.biSizeImage;
+  bmp_file_hdr.bfOffBits       = pixelDataOffset;
   HANDLE hFile =
       CreateFileW(szFile, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
     return false;
   }
   DWORD written      = 0;
-  const bool success = WriteFile(hFile, &bf, sizeof(bf), &written, nullptr) &&
-                       WriteFile(hFile, &bi, sizeof(bi), &written, nullptr) &&
-                       WriteFile(hFile, pixels.data(), bi.biSizeImage, &written, nullptr);
+  const bool success = WriteFile(hFile, &bmp_file_hdr, sizeof(bmp_file_hdr), &written, nullptr) &&
+                       WriteFile(hFile, &bmp_info, sizeof(bmp_info), &written, nullptr) &&
+                       WriteFile(hFile, pixels.data(), bmp_info.biSizeImage, &written, nullptr);
   CloseHandle(hFile);
   if (success && outSavedPath != nullptr) {
     *outSavedPath = szFile;
@@ -157,7 +157,7 @@ HFONT GetFont(int size, std::wstring font, bool italic) {
 }
 
 bool FillRectWithColor(HDC hdc, const RECT& rc, COLORREF color) {
-  bool ok = true;
+  bool success = true;
   if (hdc == nullptr) {
     return false;
   }
@@ -166,10 +166,10 @@ bool FillRectWithColor(HDC hdc, const RECT& rc, COLORREF color) {
     return false;
   }
   if (!FillRect(hdc, &rc, hBrush)) {
-    ok = false;
+    success = false;
   }
   DeleteObject(hBrush);
-  return ok;
+  return success;
 }
 
 // Fills a convex polygon with a solid color. Pen and brush share the color
@@ -355,9 +355,9 @@ static DWORD GetCommCtrlVersion() {
   if (pDllGetVersion == nullptr) {
     return 0x0;
   } else {
-    DLLVERSIONINFO dvi = {sizeof(dvi)};
-    const HRESULT hr   = pDllGetVersion(&dvi);
-    if (hr == S_OK) {
+    DLLVERSIONINFO dvi      = {sizeof(dvi)};
+    const HRESULT hresult   = pDllGetVersion(&dvi);
+    if (hresult == S_OK) {
       dwVersion = _PACKVERSION(dvi.dwMajorVersion, dvi.dwMinorVersion);
     }
   }
@@ -437,13 +437,13 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
     // a valid HMONITOR even for off-screen windows. rcWork excludes the
     // taskbar / docked appbars so the centred window doesn't end up half
     // under them.
-    HMONITOR hMon  = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO mi = {};
-    mi.cbSize      = sizeof(mi);
-    if (hMon == nullptr || !GetMonitorInfoW(hMon, &mi)) {
+    HMONITOR hMon          = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitor_info = {};
+    monitor_info.cbSize    = sizeof(monitor_info);
+    if (hMon == nullptr || !GetMonitorInfoW(hMon, &monitor_info)) {
       return false;
     }
-    screen_rect = mi.rcWork;
+    screen_rect = monitor_info.rcWork;
   } else {
     // Classic single-monitor path: GetDesktopWindow is the whole primary
     // screen rect, taskbar and all. Predates the multimon APIs and keeps
