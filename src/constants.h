@@ -73,8 +73,8 @@ inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 2;
 inline constexpr UINT kMinNumDigits = 1u; // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 
-// 100 max digits printable in output area, any more and it will only output
-// the full result to a text file, truncating to this in the output area.
+// Max digits shown in the output pane; anything beyond this is truncated and
+// the full result is written to the result file only.
 inline constexpr UINT kMaxPrintNumDigits = 32;
 
 // Output file name, written side-by-side with the .exe.

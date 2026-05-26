@@ -68,7 +68,7 @@ int cxClient = 0;
 int cyClient = 0;
 
 // Whether Pi Calculation is currently running
-volatile bool g_running = false;
+std::atomic<bool> g_running(false);
 
 // Mirrors the Settings -> Sound? menu check state. Polled by picalc.cc
 // before playing the completion chime. Initial value matches the .rc's
@@ -696,7 +696,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CLEAROUTPUT, 0), 0);
           break;
         case IDC_STOP_BUTTON:
-          if (!g_running) {
+          if (!g_running.load()) {
             EmitLine(L"No Pi threads running", false);
           }
           StopCalculation();

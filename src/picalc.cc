@@ -31,7 +31,6 @@
 
 #include "picalc.h"
 
-#include <atomic>
 #include <sstream>
 
 #include <logging.h>
@@ -409,7 +408,7 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
     std::wostringstream stop_line;
     stop_line << kStoppedMessage << digits << L" digits.";
     EmitLine(stop_line.str(), false);
-    g_running = false;
+    g_running.store(false);
     return 0;
   }
 
@@ -440,7 +439,7 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
     std::wostringstream stop_line;
     stop_line << kStoppedMessage << digits << L" digits.";
     EmitLine(stop_line.str(), false);
-    g_running = false;
+    g_running.store(false);
     return 0;
   }
 
@@ -480,7 +479,7 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
     }
   }
 
-  g_running = false;
+  g_running.store(false);
   return 0;
 }
 
@@ -491,7 +490,7 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
 // =========================================================================
 
 bool StartCalculation(int digits, int threads) {
-  if (g_running) {
+  if (g_running.load()) {
     return false;
   }
   if (digits <= 0 || threads <= 0) {
@@ -516,14 +515,14 @@ bool StartCalculation(int digits, int threads) {
     g_calc_thread = nullptr;
   }
   g_stop_requested.store(false);
-  g_running = true;
+  g_running.store(true);
   CalcArgs* args = new CalcArgs;
   args->digits   = digits;
   args->threads  = threads;
   g_calc_thread  = CreateThread(nullptr, 0, CalcThreadProc, args, 0, nullptr);
   if (g_calc_thread == nullptr) {
     delete args;
-    g_running = false;
+    g_running.store(false);
     return false;
   }
   return true;

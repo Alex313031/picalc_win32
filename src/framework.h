@@ -26,6 +26,7 @@
 
 // C++ STL Headers
 #include <algorithm> // std::min / std::max
+#include <atomic>    // std::atomic bool
 #include <cmath>     // std::cos / std::sin / std::lround
 #include <iostream>  // Console output and ostringstream
 #include <limits>    // Numeric limits

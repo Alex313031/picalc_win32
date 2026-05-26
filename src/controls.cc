@@ -346,7 +346,7 @@ void LayoutChildren(HWND parent) {
   }
 
   const int bottom_top = splitter_top + kSplitterHeight;
-  const int bottom_h   = (cy > bottom_top) ? (cy - bottom_top) : 0;
+  const int bottom_h   = (client_h > bottom_top) ? (client_h - bottom_top) : 0;
 
   // Group box: kGroupMargin (7px) on left/right/bottom; frame line lands at
   // kGroupOuterTop (10px) from client top, so the HWND sits 3px below the

@@ -11,7 +11,7 @@ extern HINSTANCE g_hInstance; // This program instance, everything descends from
 
 extern HWND mainHwnd; // Our main window handle
 
-extern HWND hStatusBar; // Our status bar
+// extern HWND hStatusBar; // TODO: status bar (planned)
 
 extern HWND hOutputEdit;  // Multiline read-only edit, bottom pane (pi output / log)
 extern HWND hSplitter;    // Draggable horizontal splitter between top + bottom panes
@@ -28,7 +28,7 @@ extern HWND hAboutButton;        // "About" button
 extern HWND hConsoleButton;  // "Show/Hide Console" button (label tracks state)
 extern HWND hExitButton;     // "Exit" button
 
-extern volatile bool g_running;  // True while a pi calculation is in progress
+extern std::atomic<bool> g_running;  // True while a pi calculation is in progress
 
 extern bool g_sound_on;        // Mirrors the Settings -> Sound? menu check state
 extern bool g_colored_output;  // Mirrors the Settings -> Colored Output Pane check state
