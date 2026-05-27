@@ -61,7 +61,7 @@ static GraphSample s_graph_samples[kGraphMaxSamples] = {};
 static int s_graph_head = 0; // index of next write slot (circular)
 
 // ---------------------------------------------------------------------------
-// Cached GDI objects — created once on first paint, process-lifetime.
+// Cached GDI objects — created once on first paint, freed in WM_DESTROY.
 // ---------------------------------------------------------------------------
 static HPEN   s_hGridPen         = nullptr;
 static HPEN   s_hTotalLinePen    = nullptr;
@@ -69,34 +69,82 @@ static HPEN   s_hKernelLinePen   = nullptr;
 static HBRUSH s_hTotalFillBrush  = nullptr;
 static HBRUSH s_hKernelFillBrush = nullptr;
 
+// ---------------------------------------------------------------------------
+// Double-buffer backbuffer — recreated on WM_SIZE, blitted to screen in WM_PAINT.
+// ---------------------------------------------------------------------------
+static HDC     s_hMemDC     = nullptr;
+static HBITMAP s_hMemBmp    = nullptr;
+static HBITMAP s_hOldMemBmp = nullptr; // default 1x1 bmp, restored before DeleteDC
+static int     s_mem_cx     = 0;
+static int     s_mem_cy     = 0;
+
 static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
     case WM_ERASEBKGND:
       return TRUE;
+
+    case WM_SIZE: {
+      // Drop the backbuffer on resize; WM_PAINT recreates it at the new size.
+      if (s_hMemBmp != nullptr) {
+        SelectObject(s_hMemDC, s_hOldMemBmp);
+        DeleteObject(s_hMemBmp);
+        s_hMemBmp    = nullptr;
+        s_hOldMemBmp = nullptr;
+      }
+      if (s_hMemDC != nullptr) {
+        DeleteDC(s_hMemDC);
+        s_hMemDC = nullptr;
+      }
+      s_mem_cx = s_mem_cy = 0;
+      return 0;
+    }
+
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
       RECT rc;
       GetClientRect(hWnd, &rc);
+      const int cx = rc.right;
+      const int cy = rc.bottom;
 
-      FillRectWithColor(hdc, rc, RGB_BLACK);
-      DrawEdge(hdc, &rc, EDGE_SUNKEN, BF_RECT);
+      // Ensure the backbuffer exists and matches the current window size.
+      if (cx > 0 && cy > 0) {
+        if (s_hMemDC == nullptr) {
+          s_hMemDC = CreateCompatibleDC(hdc);
+        }
+        if (s_hMemBmp == nullptr || s_mem_cx != cx || s_mem_cy != cy) {
+          if (s_hMemBmp != nullptr) {
+            SelectObject(s_hMemDC, s_hOldMemBmp);
+            DeleteObject(s_hMemBmp);
+          }
+          s_hMemBmp    = CreateCompatibleBitmap(hdc, cx, cy);
+          s_hOldMemBmp = static_cast<HBITMAP>(SelectObject(s_hMemDC, s_hMemBmp));
+          s_mem_cx = cx;
+          s_mem_cy = cy;
+        }
+      }
+
+      // All drawing goes into the backbuffer DC; falls back to hdc if creation failed.
+      HDC dc = (s_hMemDC != nullptr) ? s_hMemDC : hdc;
+
+      FillRectWithColor(dc, rc, RGB_BLACK);
+      DrawEdge(dc, &rc, EDGE_SUNKEN, BF_RECT);
 
       // Lazy-init all cached GDI objects on first paint.
-      if (s_hGridPen        == nullptr) s_hGridPen        = CreatePen(PS_SOLID, 1, kGraphGridColor);
-      if (s_hTotalLinePen   == nullptr) s_hTotalLinePen   = CreatePen(PS_SOLID, 1, kCpuLineColor);
-      if (s_hKernelLinePen  == nullptr) s_hKernelLinePen  = CreatePen(PS_SOLID, 1, kKernelLineColor);
+      if (s_hGridPen         == nullptr) s_hGridPen         = CreatePen(PS_SOLID, 1, kGraphGridColor);
+      if (s_hTotalLinePen    == nullptr) s_hTotalLinePen    = CreatePen(PS_SOLID, 1, kCpuLineColor);
+      if (s_hKernelLinePen   == nullptr) s_hKernelLinePen   = CreatePen(PS_SOLID, 1, kKernelLineColor);
       if (s_hTotalFillBrush  == nullptr) s_hTotalFillBrush  = CreateSolidBrush(kCpuFillColor);
       if (s_hKernelFillBrush == nullptr) s_hKernelFillBrush = CreateSolidBrush(kKernelFillColor);
 
-      HPEN   hOldPen   = static_cast<HPEN>  (SelectObject(hdc, s_hGridPen));
-      HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, GetStockObject(NULL_BRUSH)));
+      HPEN   hOldPen   = static_cast<HPEN>  (SelectObject(dc, s_hGridPen));
+      HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(dc, GetStockObject(NULL_BRUSH)));
 
       // --- Pass 0: grid ---
       for (int i = 1; i <= 9; ++i) {
         const int y = i * rc.bottom / 10;
-        MoveToEx(hdc, rc.left, y, nullptr);
-        LineTo(hdc, rc.right, y);
+        MoveToEx(dc, rc.left, y, nullptr);
+        LineTo(dc, rc.right, y);
       }
       if (rc.right > 0) {
         const int col_w = rc.right / 10;
@@ -104,8 +152,8 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
           const int phase = static_cast<int>(
               s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
           for (int x = col_w - phase; x < rc.right; x += col_w) {
-            MoveToEx(hdc, x, rc.top, nullptr);
-            LineTo(hdc, x, rc.bottom);
+            MoveToEx(dc, x, rc.top, nullptr);
+            LineTo(dc, x, rc.bottom);
           }
         }
       }
@@ -153,29 +201,55 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
         const int poly_count = actual_pts + 2;
 
         // Pass 1: total fill (null pen so Polygon draws no outline).
-        SelectObject(hdc, GetStockObject(NULL_PEN));
-        SelectObject(hdc, s_hTotalFillBrush);
-        Polygon(hdc, total_poly, poly_count);
+        SelectObject(dc, GetStockObject(NULL_PEN));
+        SelectObject(dc, s_hTotalFillBrush);
+        Polygon(dc, total_poly, poly_count);
 
         // Pass 2: total line — before any kernel painting so kernel is always on top.
-        SelectObject(hdc, s_hTotalLinePen);
-        Polyline(hdc, total_poly + 1, actual_pts);
+        SelectObject(dc, s_hTotalLinePen);
+        Polyline(dc, total_poly + 1, actual_pts);
 
         // Pass 3: kernel fill (on top of total fill and total line).
-        SelectObject(hdc, GetStockObject(NULL_PEN));
-        SelectObject(hdc, s_hKernelFillBrush);
-        Polygon(hdc, kernel_poly, poly_count);
+        SelectObject(dc, GetStockObject(NULL_PEN));
+        SelectObject(dc, s_hKernelFillBrush);
+        Polygon(dc, kernel_poly, poly_count);
 
         // Pass 4: kernel line (topmost).
-        SelectObject(hdc, s_hKernelLinePen);
-        Polyline(hdc, kernel_poly + 1, actual_pts);
+        SelectObject(dc, s_hKernelLinePen);
+        Polyline(dc, kernel_poly + 1, actual_pts);
       }
 
-      SelectObject(hdc, hOldBrush);
-      SelectObject(hdc, hOldPen);
+      SelectObject(dc, hOldBrush);
+      SelectObject(dc, hOldPen);
+
+      // Blit the fully-composed backbuffer to screen in one atomic operation.
+      if (s_hMemDC != nullptr && cx > 0 && cy > 0) {
+        BitBlt(hdc, 0, 0, cx, cy, s_hMemDC, 0, 0, SRCCOPY);
+      }
+
       EndPaint(hWnd, &ps);
       return 0;
     }
+
+    case WM_DESTROY: {
+      if (s_hMemBmp != nullptr) {
+        SelectObject(s_hMemDC, s_hOldMemBmp);
+        DeleteObject(s_hMemBmp);
+        s_hMemBmp    = nullptr;
+        s_hOldMemBmp = nullptr;
+      }
+      if (s_hMemDC != nullptr) {
+        DeleteDC(s_hMemDC);
+        s_hMemDC = nullptr;
+      }
+      if (s_hGridPen         != nullptr) { DeleteObject(s_hGridPen);         s_hGridPen         = nullptr; }
+      if (s_hTotalLinePen    != nullptr) { DeleteObject(s_hTotalLinePen);    s_hTotalLinePen    = nullptr; }
+      if (s_hKernelLinePen   != nullptr) { DeleteObject(s_hKernelLinePen);   s_hKernelLinePen   = nullptr; }
+      if (s_hTotalFillBrush  != nullptr) { DeleteObject(s_hTotalFillBrush);  s_hTotalFillBrush  = nullptr; }
+      if (s_hKernelFillBrush != nullptr) { DeleteObject(s_hKernelFillBrush); s_hKernelFillBrush = nullptr; }
+      return 0;
+    }
+
     default:
       return DefWindowProcW(hWnd, msg, wParam, lParam);
   }
@@ -351,9 +425,10 @@ void OnSysmonTick(HWND hWnd) {
     auto set_val = [&](UINT id, float pct) {
       swprintf(buf, 32, L"%.2f%%", static_cast<double>(pct));
       HWND hw = GetDlgItem(hWnd, static_cast<int>(id));
-      if (hw != nullptr) {
-        SetWindowTextW(hw, buf);
-      }
+      if (hw == nullptr) return;
+      wchar_t cur[32] = {};
+      GetWindowTextW(hw, cur, 32);
+      if (wcscmp(cur, buf) != 0) SetWindowTextW(hw, buf);
     };
     set_val(IDC_CPUIDLE,   s_cpu_stats.idle_pct);
     set_val(IDC_CPUUSER,   s_cpu_stats.user_pct);
@@ -373,9 +448,10 @@ void OnSysmonTick(HWND hWnd) {
     wchar_t buf[48];
     auto set_str = [&](UINT id, const wchar_t* str) {
       HWND hw = GetDlgItem(hWnd, static_cast<int>(id));
-      if (hw != nullptr) {
-        SetWindowTextW(hw, str);
-      }
+      if (hw == nullptr) return;
+      wchar_t cur[48] = {};
+      GetWindowTextW(hw, cur, 48);
+      if (wcscmp(cur, str) != 0) SetWindowTextW(hw, str);
     };
     FormatBytesPair(buf, 48, s_mem_stats.ram_used, s_mem_stats.ram_total);
     set_str(IDC_RAMTOTAL, buf);

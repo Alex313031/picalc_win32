@@ -50,6 +50,29 @@ static bool s_was_minimized = false;
 // ApplyMenuDefaults. Defaults to kMedSpeed if no item is checked.
 static UINT s_sysmon_speed = kMedSpeed;
 
+// Double-buffer for the main window's top pane. Created lazily in WM_PAINT,
+// resized on WM_SIZE, freed in WM_DESTROY. Eliminates the grey-flash flicker
+// caused by the parent painting under children before they repaint.
+static HDC     s_main_memDC     = nullptr;
+static HBITMAP s_main_memBmp    = nullptr;
+static HBITMAP s_main_oldMemBmp = nullptr;
+static int     s_main_mem_cx    = 0;
+static int     s_main_mem_cy    = 0;
+
+static void DestroyMainBackbuffer() {
+  if (s_main_memBmp != nullptr) {
+    SelectObject(s_main_memDC, s_main_oldMemBmp);
+    DeleteObject(s_main_memBmp);
+    s_main_memBmp    = nullptr;
+    s_main_oldMemBmp = nullptr;
+  }
+  if (s_main_memDC != nullptr) {
+    DeleteDC(s_main_memDC);
+    s_main_memDC = nullptr;
+  }
+  s_main_mem_cx = s_main_mem_cy = 0;
+}
+
 // =========================================================================
 // Globals
 // =========================================================================
@@ -161,9 +184,6 @@ bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className) {
 
 bool InitWindow(HINSTANCE hInstance, LPCWSTR className, LPCWSTR title, int iCmdShow) {
   static constexpr DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
-  // WS_CLIPCHILDREN keeps the parent's WM_PAINT from drawing through
-  // child windows (output edit + splitter), eliminating the grey
-  // flash on resize.
   static constexpr DWORD style =
       WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX;
 
@@ -578,14 +598,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     }
     case WM_ERASEBKGND: {
-      // Fill only the top pane (above the splitter) so the parent never
-      // paints over the output edit below. Without WS_CLIPCHILDREN the
-      // parent DC is not clipped, so we restrict manually.
-      // This also satisfies DrawThemeParentBackground calls from the
-      // groupbox: it forwards WM_ERASEBKGND with the child's own HDC,
-      // which is already clipped to the groupbox rect, so FillRect lands
-      // exactly where the groupbox background needs it.
+      // Two distinct callers reach here:
+      //   1) The OS, as part of our own paint cycle. WindowFromDC(hdc) == hWnd.
+      //      We defer to WM_PAINT, which composites into a backbuffer — return
+      //      TRUE to suppress the default erase (and the grey flash that comes
+      //      with it).
+      //   2) DrawThemeParentBackground from a child (typically the themed
+      //      groupbox), forwarding WM_ERASEBKGND with the child's own DC.
+      //      WindowFromDC returns the child HWND. We paint the parent bg into
+      //      that DC so the child sees the right backdrop.
       HDC hdc = reinterpret_cast<HDC>(wParam);
+      if (WindowFromDC(hdc) == hWnd) {
+        return TRUE;
+      }
       RECT client_rc;
       GetClientRect(hWnd, &client_rc);
       const int spl = GetClampedSplitterY(cyClient);
@@ -606,15 +631,60 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     }
     case WM_PAINT: {
+      // Double-buffered composition of the top pane:
+      //   1. Fill bg into the backbuffer.
+      //   2. Send WM_PRINTCLIENT to each direct child that lives in the top
+      //      pane (skipping the splitter and the output edit, which paint
+      //      themselves directly to screen below the splitter).
+      //   3. BitBlt the composed backbuffer to the screen in one operation.
+      // The OS still sends WM_PAINT to children after this; their direct
+      // repaints draw the same pixels we just BitBlt'd, so there is no
+      // visible flicker from the parent's paint cycle.
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
       RECT client_rc;
       GetClientRect(hWnd, &client_rc);
-      const int spl = GetClampedSplitterY(cyClient);
-      if (spl > 0) {
-        client_rc.bottom = spl;
+      const int spl   = GetClampedSplitterY(cyClient);
+      const int top_h = (spl > 0) ? spl : client_rc.bottom;
+      const int cx    = client_rc.right;
+
+      if (cx > 0 && top_h > 0) {
+        if (s_main_memDC == nullptr) {
+          s_main_memDC = CreateCompatibleDC(hdc);
+        }
+        if (s_main_memBmp == nullptr || s_main_mem_cx != cx || s_main_mem_cy != top_h) {
+          if (s_main_memBmp != nullptr) {
+            SelectObject(s_main_memDC, s_main_oldMemBmp);
+            DeleteObject(s_main_memBmp);
+          }
+          s_main_memBmp    = CreateCompatibleBitmap(hdc, cx, top_h);
+          s_main_oldMemBmp = static_cast<HBITMAP>(SelectObject(s_main_memDC, s_main_memBmp));
+          s_main_mem_cx    = cx;
+          s_main_mem_cy    = top_h;
+        }
+
+        RECT mem_rc = {0, 0, cx, top_h};
+        FillRectWithColor(s_main_memDC, mem_rc, g_bkg_color);
+
+        for (HWND child = GetWindow(hWnd, GW_CHILD); child != nullptr;
+             child = GetWindow(child, GW_HWNDNEXT)) {
+          if (child == hSplitter || child == hOutputEdit) continue;
+          if (!IsWindowVisible(child)) continue;
+          RECT cr;
+          GetWindowRect(child, &cr);
+          MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&cr), 2);
+          if (cr.top >= top_h) continue;
+
+          const int saved = SaveDC(s_main_memDC);
+          OffsetViewportOrgEx(s_main_memDC, cr.left, cr.top, nullptr);
+          SendMessageW(child, WM_PRINTCLIENT, reinterpret_cast<WPARAM>(s_main_memDC),
+                       PRF_CLIENT | PRF_CHILDREN | PRF_NONCLIENT);
+          RestoreDC(s_main_memDC, saved);
+        }
+
+        BitBlt(hdc, 0, 0, cx, top_h, s_main_memDC, 0, 0, SRCCOPY);
       }
-      FillRectWithColor(hdc, client_rc, g_bkg_color);
+
       EndPaint(hWnd, &ps);
       break;
     }
@@ -660,6 +730,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       if (cyClient < 0) {
         cyClient = 0;
       }
+      // Drop the backbuffer; WM_PAINT recreates it at the new size.
+      DestroyMainBackbuffer();
       LayoutChildren(hWnd);
       break;
     }
@@ -920,6 +992,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_DESTROY:
       // Close the result file
       CloseResultFile();
+      DestroyMainBackbuffer();
       PostQuitMessage(0); // WM_QUIT
       break;
     case WM_NCDESTROY:
