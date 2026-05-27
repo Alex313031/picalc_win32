@@ -7,6 +7,7 @@
 #include "main.h"
 #include "resource.h"
 #include "strings.h"
+#include "sysmon.h"
 #include "utils.h"
 
 // =========================================================================
@@ -140,6 +141,12 @@ bool CreateChildControls(HWND parent) {
       0, WC_BUTTON, kCntrlsGroupLabel, dwCHILD | BS_GROUPBOX | WS_CLIPSIBLINGS, 0, 0, 0, 0, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONTROLS_GROUP)), g_hInstance, nullptr);
   if (s_hGroupBox == nullptr) {
+    return false;
+  }
+
+  // Sysmon groupbox: sits to the right of the controls groupbox, occupying
+  // the remaining top-pane width. Position set by LayoutChildren.
+  if (!CreateSysmonControls(parent)) {
     return false;
   }
 
@@ -396,23 +403,51 @@ void LayoutChildren(HWND parent) {
   const int bottom_top = splitter_top + kSplitterHeight;
   const int bottom_h   = (client_h > bottom_top) ? (client_h - bottom_top) : 0;
 
-  // Group box: kGroupMargin (7px) on left/right/bottom; frame line lands at
-  // kGroupOuterTop (10px) from client top, so the HWND sits 3px below the
-  // client top (kGroupOuterTop - kGroupMargin). Right edge is kGroupMargin
-  // past the widest controls so the right side stays free for future widgets.
-  constexpr int kControlsRight = kPadLeft + kLabelWidth + kHGap + kComboWidth;
-  constexpr int kGroupHwndTop  = kGroupOuterTop - kGroupMargin; // = 3
-  const int group_w            = kControlsRight + kGroupMargin;
-  const int group_h            = splitter_top - kGroupMargin - kGroupHwndTop;
+  // Controls groupbox: kGroupMargin on left/right/bottom; frame line at
+  // kGroupOuterTop, so the HWND top is kGroupHwndTop = kGroupOuterTop - kGroupMargin.
+  const int group_h      = splitter_top - kGroupMargin - kGroupHwndTop;
+  // Sysmon groupbox: same top/height, starts kGroupMargin past the controls
+  // group's right edge and extends to kGroupMargin from the client right edge.
+  const int sysmon_x = kGroupMargin + kControlsGroupWidth + kGroupMargin;
+  const int sysmon_w = client_w - sysmon_x - kGroupMargin;
 
   // Batch all moves atomically via DeferWindowPos so the children
   // reposition in a single pass - no intermediate state is painted,
   // eliminating the flicker that sequential MoveWindow calls produce
   // during live resize.
-  HDWP hdwp = BeginDeferWindowPos(3);
+  // Graph area: 7px (kGroupMargin) side/bottom padding, kGroupInnerPad from the
+  // top frame line (matches the digits combo top). Fills the top half of the
+  // inner content area; the bottom half is reserved for metrics labels.
+  const int graph_x  = sysmon_x + kGroupMargin;
+  const int graph_y  = kGroupOuterTop + kGroupInnerPad;
+  const int graph_w  = sysmon_w - 2 * kGroupMargin;
+  const int inner_h  = group_h - 2 * kGroupMargin - kGroupInnerPad;
+  const int graph_h  = inner_h / 2;
+
+  const HWND hSysmonGroup = GetSysmonGroupHwnd();
+  const HWND hGraph       = GetGraphHwnd();
+  // 5 structural + 2 sub-groupboxes + 16 metric label/value statics = 23; use 25 as hint.
+  HDWP hdwp = BeginDeferWindowPos(25);
   if (hdwp != nullptr) {
-    hdwp = DeferWindowPos(hdwp, s_hGroupBox, nullptr, kGroupMargin, kGroupHwndTop, group_w, group_h,
+    hdwp = DeferWindowPos(hdwp, s_hGroupBox, nullptr, kGroupMargin, kGroupHwndTop,
+                          kControlsGroupWidth, group_h, SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+  if (hdwp != nullptr && hSysmonGroup != nullptr) {
+    hdwp = DeferWindowPos(hdwp, hSysmonGroup, nullptr, sysmon_x, kGroupHwndTop, sysmon_w, group_h,
                           SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+  if (hdwp != nullptr && hGraph != nullptr) {
+    hdwp = DeferWindowPos(hdwp, hGraph, nullptr, graph_x, graph_y, graph_w, graph_h,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+  // Sub-groupbox HWND top sits kGroupMargin above the frame line (same relationship
+  // as kGroupHwndTop = kGroupOuterTop - kGroupMargin for the outer groupboxes).
+  // Height extends from that point to the inner bottom of the sysmon groupbox.
+  const int metrics_y   = graph_y + graph_h + kVGap;
+  const int sub_grp_top = metrics_y - kGroupMargin;
+  const int sub_grp_h   = kGroupHwndTop + group_h - metrics_y;
+  if (hdwp != nullptr) {
+    hdwp = LayoutSysmonMetrics(hdwp, graph_x, sub_grp_top, graph_w, sub_grp_h);
   }
   if (hdwp != nullptr) {
     hdwp = DeferWindowPos(hdwp, hSplitter, nullptr, 0, splitter_top, client_w, kSplitterHeight,

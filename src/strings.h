@@ -24,10 +24,23 @@ inline const wchar_t* const kAboutButtonLabel = L"About";
 inline const wchar_t* const kExitButtonLabel  = L"Exit";
 inline const wchar_t* const kCntrlsGroupLabel = L"Controls";
 inline const wchar_t* const kSysmonGroupLabel = L"System Monitor";
+inline const wchar_t* const kCPUGroupLabel    = L"CPU Usage";
+inline const wchar_t* const kMemGroupLabel    = L"MEM Usage";
 inline const wchar_t* const kResultPopupTitle = L"Pi Calculation Results";
 inline const wchar_t* const kRunTitle         = L"Create New Task";
 inline const wchar_t* const kRunPrompt =
     L"Type the name of a program, folder, or file, and PiCalc will open it for you.";
+
+// Sysmon metric labels and initial value text
+inline const wchar_t* const kMetricCpuIdle   = L"CPU Idle: ";
+inline const wchar_t* const kMetricCpuUser   = L"CPU User: ";
+inline const wchar_t* const kMetricCpuKernel = L"CPU Kernel: ";
+inline const wchar_t* const kMetricCpuUsage  = L"CPU Total: ";
+inline const wchar_t* const kMetricRam       = L"RAM Usage: ";
+inline const wchar_t* const kMetricPageFile  = L"Page File Usage: ";
+inline const wchar_t* const kMetricVirtMem   = L"Commit Charge: ";
+inline const wchar_t* const kMetricSysCache  = L"System Cache: ";
+inline const wchar_t* const kMetricInitVal   = L"NaN";
 
 // Combobox items: Order = display order.
 inline const wchar_t* const kDigitOptions[] = {

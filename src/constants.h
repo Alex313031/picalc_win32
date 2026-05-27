@@ -19,15 +19,15 @@
 inline constexpr wchar_t kResultsFile[] = L"picalc_results.txt";
 
 // Default desired outer window size at startup.
-inline constexpr INT CW_WIDTH  = 700;
+inline constexpr INT CW_WIDTH  = 800;
 inline constexpr INT CW_HEIGHT = 600;
 
 // Min window size
-inline constexpr INT CW_MINWIDTH  = 480;
+inline constexpr INT CW_MINWIDTH  = 500;
 inline constexpr INT CW_MINHEIGHT = 420;
 
 // Result viewer popup window default/min dimensions.
-inline constexpr INT kResultWindowWidth     = 500;
+inline constexpr INT kResultWindowWidth     = 600;
 inline constexpr INT kResultWindowHeight    = 600;
 inline constexpr INT kResultWindowMinWidth  = 200;
 inline constexpr INT kResultWindowMinHeight = 100;
@@ -48,7 +48,7 @@ inline constexpr float kTopPaneFraction = 1.0f / 2.0f;
 inline constexpr INT kGroupMargin = 7; // groupbox outer margin: left, right, bottom
 inline constexpr INT kGroupOuterTop =
     10; // groupbox outer margin: top (distance from client top to frame line)
-inline constexpr INT kGroupInnerPad = 14; // inner padding: frame line → first control row
+inline constexpr INT kGroupInnerPad = 10; // inner padding: frame line → first control row
 inline constexpr INT kPadLeft       = 14;
 inline constexpr INT kPadTop        = 14;
 inline constexpr INT kHGap          = 5;
@@ -62,6 +62,15 @@ inline constexpr INT kButtonHeight  = 28;
 // height when open, not the always-visible field height (that's font-
 // derived). 200px gives room for ~8 options without scrolling.
 inline constexpr INT kComboDropHeight = 200;
+
+// Y of all top-pane groupbox HWNDs from client origin (frame line lands at
+// kGroupOuterTop, the HWND sits kGroupMargin above that).
+inline constexpr INT kGroupHwndTop = kGroupOuterTop - kGroupMargin;
+
+// Right edge of the controls column inside the controls groupbox, and the
+// resulting HWND width of the controls groupbox itself.
+inline constexpr INT kControlsRight      = kPadLeft + kLabelWidth + kHGap + kComboWidth;
+inline constexpr INT kControlsGroupWidth = kControlsRight + kGroupMargin;
 
 // Minimum top-pane height: enough to show all 6 button rows with inner and
 // outer groupbox padding, derived from layout constants so it stays in sync.

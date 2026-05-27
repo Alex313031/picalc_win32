@@ -46,7 +46,7 @@
 #define IDC_DIGITS_COMBO            603
 #define IDC_THREADS_LABEL           604
 #define IDC_THREADS_COMBO           605
-#define IDC_START_BUTTON            606
+#define IDC_START_BUTTON            606 // "Calculate!" button
 #define IDC_STOP_BUTTON             607
 #define IDC_OPENOUT_BUTTON          608
 #define IDC_ABOUT_BUTTON            609
@@ -67,6 +67,13 @@
 #define IDC_CACHETOTAL              623 // System cache usage / Set system cache size
 #define IDC_CLEAROUTPUT             624 // Clears output pane
 #define IDC_CLEARRESULTS            625 // Clears results .txt file
+#define IDC_SYSMON_GROUP            626 // System monitor groupbox
+#define IDC_CPUUSER                 627 // CPU user-mode % usage
+#define IDC_CPU_GROUP               628 // CPU metrics sub-groupbox
+#define IDC_MEM_GROUP               629 // Memory metrics sub-groupbox
+
+// Timer
+#define WM_MONTIMER                 400 // For system monitor ticks
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC
