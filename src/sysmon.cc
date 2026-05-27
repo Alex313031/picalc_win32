@@ -78,6 +78,123 @@ static HBITMAP s_hOldMemBmp = nullptr; // default 1x1 bmp, restored before Delet
 static int s_mem_cx         = 0;
 static int s_mem_cy         = 0;
 
+// Renders the graph (background, edge, grid, fills + lines) into `dc` using
+// `rc` as the target rect. Lazy-inits cached pens/brushes on first call;
+// restores pen/brush selection state before returning.
+static void PaintGraph(HDC dc, const RECT& rc) {
+  FillRectWithColor(dc, rc, RGB_BLACK);
+  RECT edge_rc = rc;
+  DrawEdge(dc, &edge_rc, EDGE_SUNKEN, BF_RECT);
+
+  // Lazy-init all cached GDI objects on first paint.
+  if (s_hGridPen == nullptr) {
+    s_hGridPen = CreatePen(PS_SOLID, 1, kGraphGridColor);
+  }
+  if (s_hTotalLinePen == nullptr) {
+    s_hTotalLinePen = CreatePen(PS_SOLID, 1, kCpuLineColor);
+  }
+  if (s_hKernelLinePen == nullptr) {
+    s_hKernelLinePen = CreatePen(PS_SOLID, 1, kKernelLineColor);
+  }
+  if (s_hTotalFillBrush == nullptr) {
+    s_hTotalFillBrush = CreateSolidBrush(kCpuFillColor);
+  }
+  if (s_hKernelFillBrush == nullptr) {
+    s_hKernelFillBrush = CreateSolidBrush(kKernelFillColor);
+  }
+
+  HPEN hOldPen     = static_cast<HPEN>(SelectObject(dc, s_hGridPen));
+  HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(dc, GetStockObject(NULL_BRUSH)));
+
+  // --- Pass 0: grid ---
+  for (int i = 1; i <= 9; ++i) {
+    const int y = i * rc.bottom / 10;
+    MoveToEx(dc, rc.left, y, nullptr);
+    LineTo(dc, rc.right, y);
+  }
+  if (rc.right > 0) {
+    const int col_w = rc.right / 10;
+    if (col_w > 0) {
+      const int phase = static_cast<int>(s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
+      for (int x = col_w - phase; x < rc.right; x += col_w) {
+        MoveToEx(dc, x, rc.top, nullptr);
+        LineTo(dc, x, rc.bottom);
+      }
+    }
+  }
+
+  // --- Passes 1–4: filled CPU lines (painter's algorithm) ---
+  if (rc.right > 0 && rc.bottom > 0) {
+    // How many samples fit across the width; capped to buffer size.
+    const int num_visible = rc.right / kGraphScrollStep + 2;
+    const int actual_pts  = (num_visible < kGraphMaxSamples) ? num_visible : kGraphMaxSamples;
+    const LONG x_newest   = static_cast<LONG>(rc.right) - 1L;
+    const LONG y_base     = static_cast<LONG>(rc.bottom); // one row below visible
+
+    // pct → y: 0% = rc.bottom-1 (bottom), 100% = 0 (top). Returns LONG so
+    // POINT brace-initializers get {LONG, LONG} with no narrowing conversion.
+    auto pct_to_y = [&](float pct) -> LONG {
+      if (pct < 0.0f) {
+        pct = 0.0f;
+      }
+      if (pct > 100.0f) {
+        pct = 100.0f;
+      }
+      return static_cast<LONG>(rc.bottom) - 1L -
+             static_cast<LONG>(pct * static_cast<float>(rc.bottom - 1) / 100.0f + 0.5f);
+    };
+
+    // Build polygon point arrays (left-baseline, data pts, right-baseline).
+    // poly[0]             = left baseline corner
+    // poly[1..actual_pts] = sample data, left (oldest) to right (newest)
+    // poly[actual_pts+1]  = right baseline corner
+    // Polyline for the line uses poly+1 with count actual_pts.
+    POINT total_poly[kGraphMaxSamples + 4];
+    POINT kernel_poly[kGraphMaxSamples + 4];
+
+    total_poly[0] = {
+        x_newest - static_cast<LONG>(actual_pts - 1) * static_cast<LONG>(kGraphScrollStep),
+        y_base};
+    kernel_poly[0] = total_poly[0];
+
+    for (int i = 0; i < actual_pts; ++i) {
+      // i=0 → oldest visible; i=actual_pts-1 → newest.
+      const int sample_age = actual_pts - 1 - i;
+      const int idx = ((s_graph_head - 1 - sample_age) % kGraphMaxSamples + kGraphMaxSamples) %
+                      kGraphMaxSamples;
+      const LONG x =
+          x_newest - static_cast<LONG>(sample_age) * static_cast<LONG>(kGraphScrollStep);
+      total_poly[i + 1]  = {x, pct_to_y(s_graph_samples[idx].total_pct)};
+      kernel_poly[i + 1] = {x, pct_to_y(s_graph_samples[idx].kernel_pct)};
+    }
+
+    total_poly[actual_pts + 1]  = {x_newest, y_base};
+    kernel_poly[actual_pts + 1] = {x_newest, y_base};
+    const int poly_count        = actual_pts + 2;
+
+    // Pass 1: total fill (null pen so Polygon draws no outline).
+    SelectObject(dc, GetStockObject(NULL_PEN));
+    SelectObject(dc, s_hTotalFillBrush);
+    Polygon(dc, total_poly, poly_count);
+
+    // Pass 2: total line — before any kernel painting so kernel is always on top.
+    SelectObject(dc, s_hTotalLinePen);
+    Polyline(dc, total_poly + 1, actual_pts);
+
+    // Pass 3: kernel fill (on top of total fill and total line).
+    SelectObject(dc, GetStockObject(NULL_PEN));
+    SelectObject(dc, s_hKernelFillBrush);
+    Polygon(dc, kernel_poly, poly_count);
+
+    // Pass 4: kernel line (topmost).
+    SelectObject(dc, s_hKernelLinePen);
+    Polyline(dc, kernel_poly + 1, actual_pts);
+  }
+
+  SelectObject(dc, hOldBrush);
+  SelectObject(dc, hOldPen);
+}
+
 static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
     case WM_ERASEBKGND:
@@ -126,117 +243,7 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 
       // All drawing goes into the backbuffer DC; falls back to hdc if creation failed.
       HDC dc = (s_hMemDC != nullptr) ? s_hMemDC : hdc;
-
-      FillRectWithColor(dc, rc, RGB_BLACK);
-      DrawEdge(dc, &rc, EDGE_SUNKEN, BF_RECT);
-
-      // Lazy-init all cached GDI objects on first paint.
-      if (s_hGridPen == nullptr) {
-        s_hGridPen = CreatePen(PS_SOLID, 1, kGraphGridColor);
-      }
-      if (s_hTotalLinePen == nullptr) {
-        s_hTotalLinePen = CreatePen(PS_SOLID, 1, kCpuLineColor);
-      }
-      if (s_hKernelLinePen == nullptr) {
-        s_hKernelLinePen = CreatePen(PS_SOLID, 1, kKernelLineColor);
-      }
-      if (s_hTotalFillBrush == nullptr) {
-        s_hTotalFillBrush = CreateSolidBrush(kCpuFillColor);
-      }
-      if (s_hKernelFillBrush == nullptr) {
-        s_hKernelFillBrush = CreateSolidBrush(kKernelFillColor);
-      }
-
-      HPEN hOldPen     = static_cast<HPEN>(SelectObject(dc, s_hGridPen));
-      HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(dc, GetStockObject(NULL_BRUSH)));
-
-      // --- Pass 0: grid ---
-      for (int i = 1; i <= 9; ++i) {
-        const int y = i * rc.bottom / 10;
-        MoveToEx(dc, rc.left, y, nullptr);
-        LineTo(dc, rc.right, y);
-      }
-      if (rc.right > 0) {
-        const int col_w = rc.right / 10;
-        if (col_w > 0) {
-          const int phase = static_cast<int>(s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
-          for (int x = col_w - phase; x < rc.right; x += col_w) {
-            MoveToEx(dc, x, rc.top, nullptr);
-            LineTo(dc, x, rc.bottom);
-          }
-        }
-      }
-
-      // --- Passes 1–4: filled CPU lines (painter's algorithm) ---
-      if (rc.right > 0 && rc.bottom > 0) {
-        // How many samples fit across the width; capped to buffer size.
-        const int num_visible = rc.right / kGraphScrollStep + 2;
-        const int actual_pts  = (num_visible < kGraphMaxSamples) ? num_visible : kGraphMaxSamples;
-        const LONG x_newest   = static_cast<LONG>(rc.right) - 1L;
-        const LONG y_base     = static_cast<LONG>(rc.bottom); // one row below visible
-
-        // pct → y: 0% = rc.bottom-1 (bottom), 100% = 0 (top). Returns LONG so
-        // POINT brace-initializers get {LONG, LONG} with no narrowing conversion.
-        auto pct_to_y = [&](float pct) -> LONG {
-          if (pct < 0.0f) {
-            pct = 0.0f;
-          }
-          if (pct > 100.0f) {
-            pct = 100.0f;
-          }
-          return static_cast<LONG>(rc.bottom) - 1L -
-                 static_cast<LONG>(pct * static_cast<float>(rc.bottom - 1) / 100.0f + 0.5f);
-        };
-
-        // Build polygon point arrays (left-baseline, data pts, right-baseline).
-        // poly[0]             = left baseline corner
-        // poly[1..actual_pts] = sample data, left (oldest) to right (newest)
-        // poly[actual_pts+1]  = right baseline corner
-        // Polyline for the line uses poly+1 with count actual_pts.
-        POINT total_poly[kGraphMaxSamples + 4];
-        POINT kernel_poly[kGraphMaxSamples + 4];
-
-        total_poly[0] = {
-            x_newest - static_cast<LONG>(actual_pts - 1) * static_cast<LONG>(kGraphScrollStep),
-            y_base};
-        kernel_poly[0] = total_poly[0];
-
-        for (int i = 0; i < actual_pts; ++i) {
-          // i=0 → oldest visible; i=actual_pts-1 → newest.
-          const int sample_age = actual_pts - 1 - i;
-          const int idx = ((s_graph_head - 1 - sample_age) % kGraphMaxSamples + kGraphMaxSamples) %
-                          kGraphMaxSamples;
-          const LONG x =
-              x_newest - static_cast<LONG>(sample_age) * static_cast<LONG>(kGraphScrollStep);
-          total_poly[i + 1]  = {x, pct_to_y(s_graph_samples[idx].total_pct)};
-          kernel_poly[i + 1] = {x, pct_to_y(s_graph_samples[idx].kernel_pct)};
-        }
-
-        total_poly[actual_pts + 1]  = {x_newest, y_base};
-        kernel_poly[actual_pts + 1] = {x_newest, y_base};
-        const int poly_count        = actual_pts + 2;
-
-        // Pass 1: total fill (null pen so Polygon draws no outline).
-        SelectObject(dc, GetStockObject(NULL_PEN));
-        SelectObject(dc, s_hTotalFillBrush);
-        Polygon(dc, total_poly, poly_count);
-
-        // Pass 2: total line — before any kernel painting so kernel is always on top.
-        SelectObject(dc, s_hTotalLinePen);
-        Polyline(dc, total_poly + 1, actual_pts);
-
-        // Pass 3: kernel fill (on top of total fill and total line).
-        SelectObject(dc, GetStockObject(NULL_PEN));
-        SelectObject(dc, s_hKernelFillBrush);
-        Polygon(dc, kernel_poly, poly_count);
-
-        // Pass 4: kernel line (topmost).
-        SelectObject(dc, s_hKernelLinePen);
-        Polyline(dc, kernel_poly + 1, actual_pts);
-      }
-
-      SelectObject(dc, hOldBrush);
-      SelectObject(dc, hOldPen);
+      PaintGraph(dc, rc);
 
       // Blit the fully-composed backbuffer to screen in one atomic operation.
       if (s_hMemDC != nullptr && cx > 0 && cy > 0) {
@@ -340,10 +347,8 @@ bool CreateSysmonControls(HWND parent) {
   // Metric controls are siblings of the sub-groupboxes (both children of parent).
   // They are created AFTER the sub-groupboxes so they sit higher in Z-order and
   // paint on top of the groupbox frames — the standard Win32 dialog pattern.
-  // Labels use SS_RIGHT | SS_CENTERIMAGE so the colon is flush against the value.
-  // Values use SS_LEFT  | SS_CENTERIMAGE and carry IDC_ IDs for later updates.
-  static constexpr DWORD kLabelStyle = dwCHILD | SS_RIGHT | SS_CENTERIMAGE;
-  static constexpr DWORD kValueStyle = dwCHILD | SS_LEFT | SS_CENTERIMAGE;
+  static constexpr DWORD kLabelStyle = dwCHILD | SS_LEFT | SS_CENTERIMAGE;
+  static constexpr DWORD kValueStyle = dwCHILD | SS_RIGHT | SS_CENTERIMAGE;
 
   struct MetricDef {
     HWND* label_hwnd;
@@ -489,8 +494,10 @@ void OnSysmonTick(HWND hWnd) {
     set_str(IDC_PFTOTAL, buf);
     FormatBytesPair(buf, 48, s_mem_stats.vm_used, s_mem_stats.vm_limit);
     set_str(IDC_VMTOTAL, buf);
-    // Show "used / limit" only when the OS has a finite cap configured.
-    // (SIZE_T)-1 is the sentinel Windows uses for "system-managed / no fixed limit".
+    // (SIZE_T)-1 is the sentinel Windows uses for "system-managed / no fixed
+    // cap". When there is a finite cap, show "used / cap"; when uncapped, fall
+    // back to "used / vm_limit" so the row keeps the same "x / total" shape as
+    // every other metric.
     static const ULONGLONG kCacheLimitUnlimited = static_cast<ULONGLONG>(static_cast<SIZE_T>(-1));
     if (s_mem_stats.cache_bytes == 0ULL) {
       swprintf(buf, 48, L"NaN");
@@ -498,7 +505,8 @@ void OnSysmonTick(HWND hWnd) {
       FormatBytesPair(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
                       s_mem_stats.cache_limit);
     } else {
-      FormatBytes(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes));
+      FormatBytesPair(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
+                      s_mem_stats.vm_limit);
     }
     set_str(IDC_CACHETOTAL, buf);
   }
@@ -535,16 +543,20 @@ HDWP LayoutSysmonMetrics(HDWP hdwp, int x, int y, int w, int h) {
   // client space. kGroupMargin side padding; rows are vertically centered in the
   // available inner area (frame line to inner bottom), distributing leftover height
   // equally above and below the row block.
-  const int used_h    = 4 * kControlHeight;
-  const int avail_h   = h - kGroupMargin - kGroupInnerPad - kGroupMargin;
+  // Pack rows tighter than kControlHeight (the per-row height). Labels have
+  // built-in vertical padding, so a sub-height stride just trims dead space.
+  // Sides + bottom use kGroupInnerPad (10) so that left-aligned label text
+  // and right-aligned value text aren't clipped at the groupbox frame.
+  const int stride    = kControlHeight - 4;
+  const int used_h    = 3 * stride + kControlHeight;
+  const int avail_h   = h - kGroupMargin - kGroupInnerPad - kGroupInnerPad;
   const int v_off     = (avail_h > used_h) ? (avail_h - used_h) / 2 : 0;
   const int row0_y    = y + kGroupMargin + kGroupInnerPad + v_off;
-  const int content_w = col_w - 2 * kGroupMargin;
+  const int content_w = col_w - 2 * kGroupInnerPad;
   const int lbl_w     = content_w * 55 / kLabelWidth;
   const int val_w     = content_w - lbl_w;
-  const int lbl_x_l   = x + kGroupMargin;
-  const int lbl_x_r   = rx + kGroupMargin;
-  const int stride    = kControlHeight;
+  const int lbl_x_l   = x + kGroupInnerPad;
+  const int lbl_x_r   = rx + kGroupInnerPad;
 
   struct Entry {
     HWND hw;

@@ -31,6 +31,12 @@ inline const wchar_t* const kRunTitle         = L"Create New Task";
 inline const wchar_t* const kRunPrompt =
     L"Type the name of a program, folder, or file, and PiCalc will open it for you.";
 
+// Dialog strings
+inline const wchar_t* const kDigitsDlgTitle   = L"Custom Digit Count";
+inline const wchar_t* const kThreadsDlgTitle  = L"Custom Thread Count";
+inline const wchar_t* const kDigitsDlgPrompt  = L"Enter number of Digits: ";
+inline const wchar_t* const kThreadsDlgPrompt = L"Enter number of CPU Threads: ";
+
 // Sysmon metric labels and initial value text
 inline const wchar_t* const kMetricCpuIdle   = L"CPU Idle: ";
 inline const wchar_t* const kMetricCpuUser   = L"CPU User: ";

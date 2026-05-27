@@ -51,12 +51,12 @@ void EmitLine(const std::wstring& msg, bool is_error);
 // Wipes the output edit. No-op if the control hasn't been created yet.
 void ClearOutput();
 
-// Returns the combo index and custom-injected flag that CreateChildControls
-// chose for the threads combo (based on GetLogicalProcessorCount).
-// main.cc reads these after CreateChildControls to seed s_prev_threads_sel
-// and s_threads_custom_injected.
-int GetInitialThreadsSel();
-bool IsInitialThreadsCustomInjected();
+// CBN_SELCHANGE handler for the digits and threads combos. Call from the
+// parent's WM_COMMAND when LOWORD(wParam) is IDC_DIGITS_COMBO or
+// IDC_THREADS_COMBO. Selecting "Custom" opens an input dialog and (on OK)
+// injects the validated value just before "Custom"; on Cancel, reverts to
+// the previous selection.
+void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 // Reads the current selection from the digits / threads combos and
 // converts the displayed string ("1K", "1,000", "10M", "32") to an

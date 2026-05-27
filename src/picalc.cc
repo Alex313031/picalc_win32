@@ -33,8 +33,6 @@
 
 #include <logging.h>
 
-#include <sstream>
-
 #include "constants.h"
 #include "controls.h"
 #include "resource.h"

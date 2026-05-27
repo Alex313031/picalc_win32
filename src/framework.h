@@ -32,6 +32,7 @@
 #include <iostream>  // Console output and ostringstream
 #include <limits>    // Numeric limits
 #include <random>    // Randomization functions
+#include <sstream>   // std::wostringstream
 #include <string>    // std::string / std::wstring
 #include <vector>    // Storage, used for Pixel buffers, etc.
 

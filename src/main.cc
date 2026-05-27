@@ -18,14 +18,6 @@
 // Statics
 // =========================================================================
 
-// Previous non-"Custom" selection for each combo, used to revert when the
-// user cancels the custom-input dialog. Digits defaults to index 5 ("1M");
-// threads is seeded from GetInitialThreadsSel() after CreateChildControls.
-static int s_prev_digits_sel          = 5;
-static int s_prev_threads_sel         = 0;
-static bool s_digits_custom_injected  = false;
-static bool s_threads_custom_injected = false;
-
 // Latched at startup from the .rc's initial GRAYED flag on IDM_CONSOLE.
 // When true, UpdateConsoleToggleMenu leaves the item alone (no enable,
 // no label swap) and the WM_COMMAND handler refuses to toggle - the
@@ -136,17 +128,6 @@ static int ShowVersionAndExit();
 static int ShowHelpAndExit();
 static void UpdateConsoleToggleMenu(HWND hWnd);
 static void ApplyMenuDefaults(HWND hWnd);
-
-// Params passed via DialogBoxParamW lParam for the custom-input dialog.
-struct CustomInputParams {
-  const wchar_t* title;
-  const wchar_t* prompt;
-  UINT min_val;
-  UINT max_val;
-  UINT edit_limit; // max characters the edit control accepts
-  UINT result;     // written on IDOK
-};
-
 // =========================================================================
 // Functions
 // =========================================================================
@@ -497,76 +478,6 @@ static void ApplyMenuDefaults(HWND hWnd) {
   CheckMenuRadioItem(menu, IDM_SLOW, IDM_FAST, speed_id, MF_BYCOMMAND);
 }
 
-static INT_PTR CALLBACK CustomInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
-  switch (msg) {
-    case WM_INITDIALOG: {
-      auto* params = reinterpret_cast<CustomInputParams*>(lParam);
-      SetWindowLongPtrW(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(params));
-      SetWindowTextW(hDlg, params->title);
-      SetDlgItemTextW(hDlg, IDC_CUSTOM_PROMPT, params->prompt);
-      SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETLIMITTEXT, params->edit_limit, 0);
-      // Position the dialog just below the mouse cursor, clamped to screen.
-      POINT cursor_pt;
-      GetCursorPos(&cursor_pt);
-      RECT dlg_rect;
-      GetWindowRect(hDlg, &dlg_rect);
-      const int dlg_w    = dlg_rect.right - dlg_rect.left;
-      const int dlg_h    = dlg_rect.bottom - dlg_rect.top;
-      const int screen_w = GetSystemMetrics(SM_CXSCREEN);
-      const int screen_h = GetSystemMetrics(SM_CYSCREEN);
-      int dlg_x          = cursor_pt.x;
-      int dlg_y          = cursor_pt.y + 4; // slight offset so cursor doesn't overlap the title bar
-      if (dlg_x + dlg_w > screen_w) {
-        dlg_x = screen_w - dlg_w;
-      }
-      if (dlg_y + dlg_h > screen_h) {
-        dlg_y = screen_h - dlg_h;
-      }
-      if (dlg_x < 0) {
-        dlg_x = 0;
-      }
-      if (dlg_y < 0) {
-        dlg_y = 0;
-      }
-      SetWindowPos(hDlg, nullptr, dlg_x, dlg_y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-      SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
-      return FALSE; // FALSE because we set focus manually
-    }
-    case WM_COMMAND: {
-      const int ctrl = LOWORD(wParam);
-      if (ctrl == IDOK) {
-        auto* params    = reinterpret_cast<CustomInputParams*>(GetWindowLongPtrW(hDlg, DWLP_USER));
-        wchar_t buf[32] = {};
-        GetDlgItemTextW(hDlg, IDC_CUSTOM_EDIT, buf, 32);
-        wchar_t* end            = nullptr;
-        const unsigned long val = wcstoul(buf, &end, 10);
-        if (end == buf || *end != L'\0' || val < params->min_val || val > params->max_val) {
-          wchar_t errmsg[128];
-          swprintf(errmsg, 128, L"Enter a whole number between %u and %u.", params->min_val,
-                   params->max_val);
-          WarnBox(hDlg, params->title, errmsg);
-          SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
-          SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETSEL, 0, -1);
-          return TRUE;
-        }
-        params->result = static_cast<UINT>(val);
-        EndDialog(hDlg, IDOK);
-        return TRUE;
-      }
-      if (ctrl == IDCANCEL) {
-        EndDialog(hDlg, IDCANCEL);
-        return TRUE;
-      }
-      return FALSE;
-    }
-    case WM_CLOSE:
-      EndDialog(hDlg, IDCANCEL);
-      return TRUE;
-    default:
-      return FALSE;
-  }
-}
-
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
   switch (message) {
     case WM_CREATE:
@@ -586,8 +497,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         LOG(ERROR) << L"Failed to create child controls!";
         return -1;
       }
-      s_prev_threads_sel        = GetInitialThreadsSel();
-      s_threads_custom_injected = IsInitialThreadsCustomInjected();
       InitApp(hWnd);
       SetFocus(hStartButton);
       break;
@@ -770,74 +679,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDC_DIGITS_COMBO:
-        case IDC_THREADS_COMBO: {
-          if (HIWORD(wParam) != CBN_SELCHANGE) {
-            break;
-          }
-          HWND hCombo          = reinterpret_cast<HWND>(lParam);
-          const bool is_digits = (command == IDC_DIGITS_COMBO);
-          const int count      = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
-          const int sel        = static_cast<int>(SendMessageW(hCombo, CB_GETCURSEL, 0, 0));
-          if (sel == CB_ERR) {
-            break;
-          }
-          // "Custom" is always the last item; anything else just updates the
-          // previous-selection tracker so we know what to revert to on Cancel.
-          if (sel != count - 1) {
-            if (is_digits) {
-              s_prev_digits_sel = sel;
-            } else {
-              s_prev_threads_sel = sel;
-            }
-            break;
-          }
-          // "Custom" was selected — show the input dialog.
-          CustomInputParams params = {};
-          if (is_digits) {
-            params.title      = L"Custom Digit Count";
-            params.prompt     = L"Enter number of digits:";
-            params.min_val    = kMinNumDigits;
-            params.max_val    = kMaxNumDigits;
-            params.edit_limit = 10; // 1,000,000,000 = 10 digits
-          } else {
-            params.title      = L"Custom Thread Count";
-            params.prompt     = L"Enter number of threads:";
-            params.min_val    = kMinNumThreads;
-            params.max_val    = kMaxNumThreads;
-            params.edit_limit = 3; // 256 = 3 digits
-          }
-          const INT_PTR res =
-              DialogBoxParamW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOM_INPUT), hWnd,
-                              CustomInputDlgProc, reinterpret_cast<LPARAM>(&params));
-          if (res == IDOK) {
-            // Format the validated value and inject it just before "Custom".
-            wchar_t val_str[32];
-            swprintf(val_str, 32, L"%u", params.result);
-            // Remove any previously injected custom item (always at count-2
-            // when injected == true, because "Custom" stays last).
-            bool& injected = is_digits ? s_digits_custom_injected : s_threads_custom_injected;
-            if (injected) {
-              const int cur_count = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
-              SendMessageW(hCombo, CB_DELETESTRING, cur_count - 2, 0);
-            }
-            const int insert_at = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0)) - 1;
-            SendMessageW(hCombo, CB_INSERTSTRING, insert_at, reinterpret_cast<LPARAM>(val_str));
-            SendMessageW(hCombo, CB_SETCURSEL, insert_at, 0);
-            injected = true;
-            if (is_digits) {
-              s_prev_digits_sel = insert_at;
-            } else {
-              s_prev_threads_sel = insert_at;
-            }
-          } else {
-            // Revert to the last known good selection.
-            const int prev = is_digits ? s_prev_digits_sel : s_prev_threads_sel;
-            if (prev >= 0) {
-              SendMessageW(hCombo, CB_SETCURSEL, prev, 0);
-            }
-          }
+        case IDC_THREADS_COMBO:
+          HandleComboBoxes(hWnd, wParam, lParam);
           break;
-        }
         case IDC_CONSOLE_BUTTON:
           SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CONSOLE, 0), 0);
           break;
