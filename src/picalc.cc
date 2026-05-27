@@ -93,8 +93,8 @@ namespace {
   // Heap allocation lets CalcThreadProc bail on stop without waiting for
   // the sqrt to finish — StartCalculation joins and frees it before the
   // next precision change so two sqrt workers never overlap.
-  HANDLE    g_sqrt_thread = nullptr;
-  SqrtArgs* g_sqrt_args   = nullptr;
+  HANDLE g_sqrt_thread  = nullptr;
+  SqrtArgs* g_sqrt_args = nullptr;
 
   // Per-node binary-splitting tuple. T already folds in the leaf's
   // (A + B*k) factor, so the final formula needs Q and T only.
@@ -208,9 +208,13 @@ namespace {
                              mpz_size(left_pqt.T.get_mpz_t()) > kParallelMulThresholdLimbs;
     if (!parallelize) {
       out->P = left_pqt.P * right_pqt.P;
-      if (StopRequested()) return;
+      if (StopRequested()) {
+        return;
+      }
       out->Q = left_pqt.Q * right_pqt.Q;
-      if (StopRequested()) return;
+      if (StopRequested()) {
+        return;
+      }
       out->T = right_pqt.Q * left_pqt.T + left_pqt.P * right_pqt.T;
       return;
     }
@@ -432,7 +436,7 @@ namespace {
     if (g_sqrt_thread != nullptr) {
       WaitForSingleObject(g_sqrt_thread, INFINITE);
       CloseHandle(g_sqrt_thread);
-      g_sqrt_thread = nullptr;
+      g_sqrt_thread            = nullptr;
       const DWORD sqrt_wait_ms = GetTickCount() - t_bs_end;
       if (sqrt_wait_ms > 0) {
         std::wostringstream line;

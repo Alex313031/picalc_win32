@@ -314,32 +314,42 @@ bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build) {
   // flag into the top 4 bits of buildVer — mask them off so callers see the
   // plain build number (e.g. 2600 for XP SP3, 19045 for Win10 22H2).
   const RtlGetNtVersionNumbers_t pfnRtlGetNtVersionNumbers =
-      reinterpret_cast<RtlGetNtVersionNumbers_t>(
-          GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
+      reinterpret_cast<RtlGetNtVersionNumbers_t>(GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
   if (pfnRtlGetNtVersionNumbers != nullptr) {
     DWORD majorVer = 0, minorVer = 0, buildVer = 0;
     pfnRtlGetNtVersionNumbers(&majorVer, &minorVer, &buildVer);
     if (majorVer != 0) {
-      if (major != nullptr) *major = static_cast<UINT>(majorVer);
-      if (minor != nullptr) *minor = static_cast<UINT>(minorVer);
-      if (build != nullptr) *build = static_cast<UINT>(buildVer & 0x0FFFFFFFu);
+      if (major != nullptr) {
+        *major = static_cast<UINT>(majorVer);
+      }
+      if (minor != nullptr) {
+        *minor = static_cast<UINT>(minorVer);
+      }
+      if (build != nullptr) {
+        *build = static_cast<UINT>(buildVer & 0x0FFFFFFFu);
+      }
       return true;
     }
   }
 
   // Fallback: RtlGetVersion (Win2K+, documented NT-native, not shimmed by
   // application-compatibility manifests unlike GetVersionExW on Win8.1+).
-  typedef LONG (WINAPI* RtlGetVersion_t)(OSVERSIONINFOW*);
+  typedef LONG(WINAPI * RtlGetVersion_t)(OSVERSIONINFOW*);
   const RtlGetVersion_t pfnRtlGetVersion =
-      reinterpret_cast<RtlGetVersion_t>(
-          GetProcAddress(hNtDll, "RtlGetVersion"));
+      reinterpret_cast<RtlGetVersion_t>(GetProcAddress(hNtDll, "RtlGetVersion"));
   if (pfnRtlGetVersion != nullptr) {
-    OSVERSIONINFOW vi = {};
+    OSVERSIONINFOW vi      = {};
     vi.dwOSVersionInfoSize = sizeof(vi);
     if (pfnRtlGetVersion(&vi) == 0 && vi.dwMajorVersion != 0) {
-      if (major != nullptr) *major = static_cast<UINT>(vi.dwMajorVersion);
-      if (minor != nullptr) *minor = static_cast<UINT>(vi.dwMinorVersion);
-      if (build != nullptr) *build = static_cast<UINT>(vi.dwBuildNumber);
+      if (major != nullptr) {
+        *major = static_cast<UINT>(vi.dwMajorVersion);
+      }
+      if (minor != nullptr) {
+        *minor = static_cast<UINT>(vi.dwMinorVersion);
+      }
+      if (build != nullptr) {
+        *build = static_cast<UINT>(vi.dwBuildNumber);
+      }
       return true;
     }
   }

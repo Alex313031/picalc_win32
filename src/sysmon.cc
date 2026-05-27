@@ -58,25 +58,25 @@ struct GraphSample {
 };
 
 static GraphSample s_graph_samples[kGraphMaxSamples] = {};
-static int s_graph_head = 0; // index of next write slot (circular)
+static int s_graph_head                              = 0; // index of next write slot (circular)
 
 // ---------------------------------------------------------------------------
 // Cached GDI objects — created once on first paint, freed in WM_DESTROY.
 // ---------------------------------------------------------------------------
-static HPEN   s_hGridPen         = nullptr;
-static HPEN   s_hTotalLinePen    = nullptr;
-static HPEN   s_hKernelLinePen   = nullptr;
+static HPEN s_hGridPen           = nullptr;
+static HPEN s_hTotalLinePen      = nullptr;
+static HPEN s_hKernelLinePen     = nullptr;
 static HBRUSH s_hTotalFillBrush  = nullptr;
 static HBRUSH s_hKernelFillBrush = nullptr;
 
 // ---------------------------------------------------------------------------
 // Double-buffer backbuffer — recreated on WM_SIZE, blitted to screen in WM_PAINT.
 // ---------------------------------------------------------------------------
-static HDC     s_hMemDC     = nullptr;
+static HDC s_hMemDC         = nullptr;
 static HBITMAP s_hMemBmp    = nullptr;
 static HBITMAP s_hOldMemBmp = nullptr; // default 1x1 bmp, restored before DeleteDC
-static int     s_mem_cx     = 0;
-static int     s_mem_cy     = 0;
+static int s_mem_cx         = 0;
+static int s_mem_cy         = 0;
 
 static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
@@ -119,8 +119,8 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
           }
           s_hMemBmp    = CreateCompatibleBitmap(hdc, cx, cy);
           s_hOldMemBmp = static_cast<HBITMAP>(SelectObject(s_hMemDC, s_hMemBmp));
-          s_mem_cx = cx;
-          s_mem_cy = cy;
+          s_mem_cx     = cx;
+          s_mem_cy     = cy;
         }
       }
 
@@ -131,13 +131,23 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
       DrawEdge(dc, &rc, EDGE_SUNKEN, BF_RECT);
 
       // Lazy-init all cached GDI objects on first paint.
-      if (s_hGridPen         == nullptr) s_hGridPen         = CreatePen(PS_SOLID, 1, kGraphGridColor);
-      if (s_hTotalLinePen    == nullptr) s_hTotalLinePen    = CreatePen(PS_SOLID, 1, kCpuLineColor);
-      if (s_hKernelLinePen   == nullptr) s_hKernelLinePen   = CreatePen(PS_SOLID, 1, kKernelLineColor);
-      if (s_hTotalFillBrush  == nullptr) s_hTotalFillBrush  = CreateSolidBrush(kCpuFillColor);
-      if (s_hKernelFillBrush == nullptr) s_hKernelFillBrush = CreateSolidBrush(kKernelFillColor);
+      if (s_hGridPen == nullptr) {
+        s_hGridPen = CreatePen(PS_SOLID, 1, kGraphGridColor);
+      }
+      if (s_hTotalLinePen == nullptr) {
+        s_hTotalLinePen = CreatePen(PS_SOLID, 1, kCpuLineColor);
+      }
+      if (s_hKernelLinePen == nullptr) {
+        s_hKernelLinePen = CreatePen(PS_SOLID, 1, kKernelLineColor);
+      }
+      if (s_hTotalFillBrush == nullptr) {
+        s_hTotalFillBrush = CreateSolidBrush(kCpuFillColor);
+      }
+      if (s_hKernelFillBrush == nullptr) {
+        s_hKernelFillBrush = CreateSolidBrush(kKernelFillColor);
+      }
 
-      HPEN   hOldPen   = static_cast<HPEN>  (SelectObject(dc, s_hGridPen));
+      HPEN hOldPen     = static_cast<HPEN>(SelectObject(dc, s_hGridPen));
       HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(dc, GetStockObject(NULL_BRUSH)));
 
       // --- Pass 0: grid ---
@@ -149,8 +159,7 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
       if (rc.right > 0) {
         const int col_w = rc.right / 10;
         if (col_w > 0) {
-          const int phase = static_cast<int>(
-              s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
+          const int phase = static_cast<int>(s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
           for (int x = col_w - phase; x < rc.right; x += col_w) {
             MoveToEx(dc, x, rc.top, nullptr);
             LineTo(dc, x, rc.bottom);
@@ -161,18 +170,22 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
       // --- Passes 1–4: filled CPU lines (painter's algorithm) ---
       if (rc.right > 0 && rc.bottom > 0) {
         // How many samples fit across the width; capped to buffer size.
-        const int  num_visible = rc.right / kGraphScrollStep + 2;
-        const int  actual_pts  = (num_visible < kGraphMaxSamples) ? num_visible : kGraphMaxSamples;
-        const LONG x_newest    = static_cast<LONG>(rc.right) - 1L;
-        const LONG y_base      = static_cast<LONG>(rc.bottom); // one row below visible
+        const int num_visible = rc.right / kGraphScrollStep + 2;
+        const int actual_pts  = (num_visible < kGraphMaxSamples) ? num_visible : kGraphMaxSamples;
+        const LONG x_newest   = static_cast<LONG>(rc.right) - 1L;
+        const LONG y_base     = static_cast<LONG>(rc.bottom); // one row below visible
 
         // pct → y: 0% = rc.bottom-1 (bottom), 100% = 0 (top). Returns LONG so
         // POINT brace-initializers get {LONG, LONG} with no narrowing conversion.
         auto pct_to_y = [&](float pct) -> LONG {
-          if (pct < 0.0f)   pct = 0.0f;
-          if (pct > 100.0f) pct = 100.0f;
-          return static_cast<LONG>(rc.bottom) - 1L
-               - static_cast<LONG>(pct * static_cast<float>(rc.bottom - 1) / 100.0f + 0.5f);
+          if (pct < 0.0f) {
+            pct = 0.0f;
+          }
+          if (pct > 100.0f) {
+            pct = 100.0f;
+          }
+          return static_cast<LONG>(rc.bottom) - 1L -
+                 static_cast<LONG>(pct * static_cast<float>(rc.bottom - 1) / 100.0f + 0.5f);
         };
 
         // Build polygon point arrays (left-baseline, data pts, right-baseline).
@@ -180,25 +193,28 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
         // poly[1..actual_pts] = sample data, left (oldest) to right (newest)
         // poly[actual_pts+1]  = right baseline corner
         // Polyline for the line uses poly+1 with count actual_pts.
-        POINT total_poly [kGraphMaxSamples + 4];
+        POINT total_poly[kGraphMaxSamples + 4];
         POINT kernel_poly[kGraphMaxSamples + 4];
 
-        total_poly [0] = { x_newest - static_cast<LONG>(actual_pts - 1) * static_cast<LONG>(kGraphScrollStep), y_base };
+        total_poly[0] = {
+            x_newest - static_cast<LONG>(actual_pts - 1) * static_cast<LONG>(kGraphScrollStep),
+            y_base};
         kernel_poly[0] = total_poly[0];
 
         for (int i = 0; i < actual_pts; ++i) {
           // i=0 → oldest visible; i=actual_pts-1 → newest.
-          const int  sample_age = actual_pts - 1 - i;
-          const int  idx = ((s_graph_head - 1 - sample_age) % kGraphMaxSamples
-                           + kGraphMaxSamples) % kGraphMaxSamples;
-          const LONG x   = x_newest - static_cast<LONG>(sample_age) * static_cast<LONG>(kGraphScrollStep);
-          total_poly [i + 1] = { x, pct_to_y(s_graph_samples[idx].total_pct)  };
-          kernel_poly[i + 1] = { x, pct_to_y(s_graph_samples[idx].kernel_pct) };
+          const int sample_age = actual_pts - 1 - i;
+          const int idx = ((s_graph_head - 1 - sample_age) % kGraphMaxSamples + kGraphMaxSamples) %
+                          kGraphMaxSamples;
+          const LONG x =
+              x_newest - static_cast<LONG>(sample_age) * static_cast<LONG>(kGraphScrollStep);
+          total_poly[i + 1]  = {x, pct_to_y(s_graph_samples[idx].total_pct)};
+          kernel_poly[i + 1] = {x, pct_to_y(s_graph_samples[idx].kernel_pct)};
         }
 
-        total_poly [actual_pts + 1] = { x_newest, y_base };
-        kernel_poly[actual_pts + 1] = { x_newest, y_base };
-        const int poly_count = actual_pts + 2;
+        total_poly[actual_pts + 1]  = {x_newest, y_base};
+        kernel_poly[actual_pts + 1] = {x_newest, y_base};
+        const int poly_count        = actual_pts + 2;
 
         // Pass 1: total fill (null pen so Polygon draws no outline).
         SelectObject(dc, GetStockObject(NULL_PEN));
@@ -242,11 +258,26 @@ static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
         DeleteDC(s_hMemDC);
         s_hMemDC = nullptr;
       }
-      if (s_hGridPen         != nullptr) { DeleteObject(s_hGridPen);         s_hGridPen         = nullptr; }
-      if (s_hTotalLinePen    != nullptr) { DeleteObject(s_hTotalLinePen);    s_hTotalLinePen    = nullptr; }
-      if (s_hKernelLinePen   != nullptr) { DeleteObject(s_hKernelLinePen);   s_hKernelLinePen   = nullptr; }
-      if (s_hTotalFillBrush  != nullptr) { DeleteObject(s_hTotalFillBrush);  s_hTotalFillBrush  = nullptr; }
-      if (s_hKernelFillBrush != nullptr) { DeleteObject(s_hKernelFillBrush); s_hKernelFillBrush = nullptr; }
+      if (s_hGridPen != nullptr) {
+        DeleteObject(s_hGridPen);
+        s_hGridPen = nullptr;
+      }
+      if (s_hTotalLinePen != nullptr) {
+        DeleteObject(s_hTotalLinePen);
+        s_hTotalLinePen = nullptr;
+      }
+      if (s_hKernelLinePen != nullptr) {
+        DeleteObject(s_hKernelLinePen);
+        s_hKernelLinePen = nullptr;
+      }
+      if (s_hTotalFillBrush != nullptr) {
+        DeleteObject(s_hTotalFillBrush);
+        s_hTotalFillBrush = nullptr;
+      }
+      if (s_hKernelFillBrush != nullptr) {
+        DeleteObject(s_hKernelFillBrush);
+        s_hKernelFillBrush = nullptr;
+      }
       return 0;
     }
 
@@ -278,16 +309,14 @@ bool CreateSysmonControls(HWND parent) {
   }
 
   s_hSysmonGroup = CreateWindowExW(
-      0, WC_BUTTON, kSysmonGroupLabel,
-      dwCHILD | BS_GROUPBOX | WS_CLIPSIBLINGS, 0, 0, 0, 0, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_SYSMON_GROUP)),
-      g_hInstance, nullptr);
+      0, WC_BUTTON, kSysmonGroupLabel, dwCHILD | BS_GROUPBOX | WS_CLIPSIBLINGS, 0, 0, 0, 0, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_SYSMON_GROUP)), g_hInstance, nullptr);
   if (s_hSysmonGroup == nullptr) {
     return false;
   }
 
-  s_hGraph = CreateWindowExW(0, kGraphClassName, L"", dwCHILD, 0, 0, 0, 0, parent,
-                             nullptr, g_hInstance, nullptr);
+  s_hGraph = CreateWindowExW(0, kGraphClassName, L"", dwCHILD, 0, 0, 0, 0, parent, nullptr,
+                             g_hInstance, nullptr);
   if (s_hGraph == nullptr) {
     return false;
   }
@@ -295,19 +324,15 @@ bool CreateSysmonControls(HWND parent) {
   // Sub-groupboxes: no WS_CLIPSIBLINGS so the frame is not clipped out by the
   // higher-Z metric controls that visually sit inside it.
   s_hCpuGroup = CreateWindowExW(
-      0, WC_BUTTON, kCPUGroupLabel,
-      dwCHILD | BS_GROUPBOX, 0, 0, 0, 0, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CPU_GROUP)),
-      g_hInstance, nullptr);
+      0, WC_BUTTON, kCPUGroupLabel, dwCHILD | BS_GROUPBOX, 0, 0, 0, 0, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CPU_GROUP)), g_hInstance, nullptr);
   if (s_hCpuGroup == nullptr) {
     return false;
   }
 
   s_hMemGroup = CreateWindowExW(
-      0, WC_BUTTON, kMemGroupLabel,
-      dwCHILD | BS_GROUPBOX, 0, 0, 0, 0, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_MEM_GROUP)),
-      g_hInstance, nullptr);
+      0, WC_BUTTON, kMemGroupLabel, dwCHILD | BS_GROUPBOX, 0, 0, 0, 0, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_MEM_GROUP)), g_hInstance, nullptr);
   if (s_hMemGroup == nullptr) {
     return false;
   }
@@ -318,34 +343,33 @@ bool CreateSysmonControls(HWND parent) {
   // Labels use SS_RIGHT | SS_CENTERIMAGE so the colon is flush against the value.
   // Values use SS_LEFT  | SS_CENTERIMAGE and carry IDC_ IDs for later updates.
   static constexpr DWORD kLabelStyle = dwCHILD | SS_RIGHT | SS_CENTERIMAGE;
-  static constexpr DWORD kValueStyle = dwCHILD | SS_LEFT  | SS_CENTERIMAGE;
+  static constexpr DWORD kValueStyle = dwCHILD | SS_LEFT | SS_CENTERIMAGE;
 
   struct MetricDef {
-    HWND*          label_hwnd;
-    HWND*          value_hwnd;
+    HWND* label_hwnd;
+    HWND* value_hwnd;
     const wchar_t* label_text;
-    UINT           value_id;
+    UINT value_id;
   };
   const MetricDef kMetrics[] = {
-    { &s_hCpuIdleLabel,   &s_hCpuIdleValue,   kMetricCpuIdle,   IDC_CPUIDLE    },
-    { &s_hCpuUserLabel,   &s_hCpuUserValue,   kMetricCpuUser,   IDC_CPUUSER    },
-    { &s_hCpuKernelLabel, &s_hCpuKernelValue, kMetricCpuKernel, IDC_CPUKERNEL  },
-    { &s_hCpuUsageLabel,  &s_hCpuUsageValue,  kMetricCpuUsage,  IDC_CPUTOTAL   },
-    { &s_hRamLabel,       &s_hRamValue,       kMetricRam,       IDC_RAMTOTAL   },
-    { &s_hPfLabel,        &s_hPfValue,        kMetricPageFile,  IDC_PFTOTAL    },
-    { &s_hVmLabel,        &s_hVmValue,        kMetricVirtMem,   IDC_VMTOTAL    },
-    { &s_hCacheLabel,     &s_hCacheValue,     kMetricSysCache,  IDC_CACHETOTAL },
+      {&s_hCpuIdleLabel, &s_hCpuIdleValue, kMetricCpuIdle, IDC_CPUIDLE},
+      {&s_hCpuUserLabel, &s_hCpuUserValue, kMetricCpuUser, IDC_CPUUSER},
+      {&s_hCpuKernelLabel, &s_hCpuKernelValue, kMetricCpuKernel, IDC_CPUKERNEL},
+      {&s_hCpuUsageLabel, &s_hCpuUsageValue, kMetricCpuUsage, IDC_CPUTOTAL},
+      {&s_hRamLabel, &s_hRamValue, kMetricRam, IDC_RAMTOTAL},
+      {&s_hPfLabel, &s_hPfValue, kMetricPageFile, IDC_PFTOTAL},
+      {&s_hVmLabel, &s_hVmValue, kMetricVirtMem, IDC_VMTOTAL},
+      {&s_hCacheLabel, &s_hCacheValue, kMetricSysCache, IDC_CACHETOTAL},
   };
   for (const auto& m : kMetrics) {
-    *(m.label_hwnd) = CreateWindowExW(0, WC_STATIC, m.label_text,
-        kLabelStyle, 0, 0, 0, 0, parent, nullptr, g_hInstance, nullptr);
+    *(m.label_hwnd) = CreateWindowExW(0, WC_STATIC, m.label_text, kLabelStyle, 0, 0, 0, 0, parent,
+                                      nullptr, g_hInstance, nullptr);
     if (*(m.label_hwnd) == nullptr) {
       return false;
     }
-    *(m.value_hwnd) = CreateWindowExW(0, WC_STATIC, kMetricInitVal,
-        kValueStyle, 0, 0, 0, 0, parent,
-        reinterpret_cast<HMENU>(static_cast<UINT_PTR>(m.value_id)),
-        g_hInstance, nullptr);
+    *(m.value_hwnd) = CreateWindowExW(0, WC_STATIC, kMetricInitVal, kValueStyle, 0, 0, 0, 0, parent,
+                                      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(m.value_id)),
+                                      g_hInstance, nullptr);
     if (*(m.value_hwnd) == nullptr) {
       return false;
     }
@@ -356,16 +380,10 @@ bool CreateSysmonControls(HWND parent) {
     hMonFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
   }
   const HWND kFontTargets[] = {
-    s_hSysmonGroup,
-    s_hCpuGroup,       s_hMemGroup,
-    s_hCpuIdleLabel,   s_hCpuIdleValue,
-    s_hCpuUserLabel,   s_hCpuUserValue,
-    s_hCpuKernelLabel, s_hCpuKernelValue,
-    s_hCpuUsageLabel,  s_hCpuUsageValue,
-    s_hRamLabel,       s_hRamValue,
-    s_hPfLabel,        s_hPfValue,
-    s_hVmLabel,        s_hVmValue,
-    s_hCacheLabel,     s_hCacheValue,
+      s_hSysmonGroup,   s_hCpuGroup,     s_hMemGroup,       s_hCpuIdleLabel,   s_hCpuIdleValue,
+      s_hCpuUserLabel,  s_hCpuUserValue, s_hCpuKernelLabel, s_hCpuKernelValue, s_hCpuUsageLabel,
+      s_hCpuUsageValue, s_hRamLabel,     s_hRamValue,       s_hPfLabel,        s_hPfValue,
+      s_hVmLabel,       s_hVmValue,      s_hCacheLabel,     s_hCacheValue,
   };
   for (HWND hw : kFontTargets) {
     SendMessageW(hw, WM_SETFONT, reinterpret_cast<WPARAM>(hMonFont), MAKELPARAM(FALSE, 0));
@@ -425,21 +443,25 @@ void OnSysmonTick(HWND hWnd) {
     auto set_val = [&](UINT id, float pct) {
       swprintf(buf, 32, L"%.2f%%", static_cast<double>(pct));
       HWND hw = GetDlgItem(hWnd, static_cast<int>(id));
-      if (hw == nullptr) return;
+      if (hw == nullptr) {
+        return;
+      }
       wchar_t cur[32] = {};
       GetWindowTextW(hw, cur, 32);
-      if (wcscmp(cur, buf) != 0) SetWindowTextW(hw, buf);
+      if (wcscmp(cur, buf) != 0) {
+        SetWindowTextW(hw, buf);
+      }
     };
-    set_val(IDC_CPUIDLE,   s_cpu_stats.idle_pct);
-    set_val(IDC_CPUUSER,   s_cpu_stats.user_pct);
+    set_val(IDC_CPUIDLE, s_cpu_stats.idle_pct);
+    set_val(IDC_CPUUSER, s_cpu_stats.user_pct);
     set_val(IDC_CPUKERNEL, s_cpu_stats.kernel_pct);
-    set_val(IDC_CPUTOTAL,  s_cpu_stats.total_pct);
+    set_val(IDC_CPUTOTAL, s_cpu_stats.total_pct);
   }
 
   // Record graph sample. Uses current s_cpu_stats — zeroed until the first
   // successful UpdateCpuStats call, which gives the "ramps up from 0" effect.
-  s_graph_samples[s_graph_head] = { s_cpu_stats.total_pct, s_cpu_stats.kernel_pct };
-  s_graph_head = (s_graph_head + 1) % kGraphMaxSamples;
+  s_graph_samples[s_graph_head] = {s_cpu_stats.total_pct, s_cpu_stats.kernel_pct};
+  s_graph_head                  = (s_graph_head + 1) % kGraphMaxSamples;
 
   // Update memory stats.
   MemStats mem = {};
@@ -448,10 +470,14 @@ void OnSysmonTick(HWND hWnd) {
     wchar_t buf[48];
     auto set_str = [&](UINT id, const wchar_t* str) {
       HWND hw = GetDlgItem(hWnd, static_cast<int>(id));
-      if (hw == nullptr) return;
+      if (hw == nullptr) {
+        return;
+      }
       wchar_t cur[48] = {};
       GetWindowTextW(hw, cur, 48);
-      if (wcscmp(cur, str) != 0) SetWindowTextW(hw, str);
+      if (wcscmp(cur, str) != 0) {
+        SetWindowTextW(hw, str);
+      }
     };
     FormatBytesPair(buf, 48, s_mem_stats.ram_used, s_mem_stats.ram_total);
     set_str(IDC_RAMTOTAL, buf);
@@ -465,13 +491,11 @@ void OnSysmonTick(HWND hWnd) {
     set_str(IDC_VMTOTAL, buf);
     // Show "used / limit" only when the OS has a finite cap configured.
     // (SIZE_T)-1 is the sentinel Windows uses for "system-managed / no fixed limit".
-    static const ULONGLONG kCacheLimitUnlimited =
-        static_cast<ULONGLONG>(static_cast<SIZE_T>(-1));
+    static const ULONGLONG kCacheLimitUnlimited = static_cast<ULONGLONG>(static_cast<SIZE_T>(-1));
     if (s_mem_stats.cache_bytes == 0ULL) {
       swprintf(buf, 48, L"NaN");
     } else if (s_mem_stats.cache_limit != kCacheLimitUnlimited && s_mem_stats.cache_limit > 0ULL) {
-      FormatBytesPair(buf, 48,
-                      static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
+      FormatBytesPair(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
                       s_mem_stats.cache_limit);
     } else {
       FormatBytes(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes));
@@ -499,47 +523,50 @@ HDWP LayoutSysmonMetrics(HDWP hdwp, int x, int y, int w, int h) {
 
   // Sub-groupboxes in parent-window client coords.
   if (s_hCpuGroup != nullptr && hdwp != nullptr) {
-    hdwp = DeferWindowPos(hdwp, s_hCpuGroup, nullptr, x, y, col_w, h,
-                          SWP_NOZORDER | SWP_NOACTIVATE);
+    hdwp =
+        DeferWindowPos(hdwp, s_hCpuGroup, nullptr, x, y, col_w, h, SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (s_hMemGroup != nullptr && hdwp != nullptr) {
-    hdwp = DeferWindowPos(hdwp, s_hMemGroup, nullptr, rx, y, col_w, h,
-                          SWP_NOZORDER | SWP_NOACTIVATE);
+    hdwp =
+        DeferWindowPos(hdwp, s_hMemGroup, nullptr, rx, y, col_w, h, SWP_NOZORDER | SWP_NOACTIVATE);
   }
 
   // Metric controls are siblings of the sub-groupboxes; coords are in parent-window
   // client space. kGroupMargin side padding; rows are vertically centered in the
   // available inner area (frame line to inner bottom), distributing leftover height
   // equally above and below the row block.
-  const int used_h  = 4 * kControlHeight;
-  const int avail_h = h - kGroupMargin - kGroupInnerPad - kGroupMargin;
-  const int v_off   = (avail_h > used_h) ? (avail_h - used_h) / 2 : 0;
-  const int row0_y  = y + kGroupMargin + kGroupInnerPad + v_off;
+  const int used_h    = 4 * kControlHeight;
+  const int avail_h   = h - kGroupMargin - kGroupInnerPad - kGroupMargin;
+  const int v_off     = (avail_h > used_h) ? (avail_h - used_h) / 2 : 0;
+  const int row0_y    = y + kGroupMargin + kGroupInnerPad + v_off;
   const int content_w = col_w - 2 * kGroupMargin;
   const int lbl_w     = content_w * 55 / kLabelWidth;
   const int val_w     = content_w - lbl_w;
-  const int lbl_x_l   = x  + kGroupMargin;
+  const int lbl_x_l   = x + kGroupMargin;
   const int lbl_x_r   = rx + kGroupMargin;
   const int stride    = kControlHeight;
 
-  struct Entry { HWND hw; int cx, cy, cw, ch; };
+  struct Entry {
+    HWND hw;
+    int cx, cy, cw, ch;
+  };
   const Entry entries[] = {
-    { s_hCpuIdleLabel,   lbl_x_l,        row0_y,          lbl_w, kControlHeight },
-    { s_hCpuIdleValue,   lbl_x_l+lbl_w,  row0_y,          val_w, kControlHeight },
-    { s_hCpuUserLabel,   lbl_x_l,        row0_y+stride,   lbl_w, kControlHeight },
-    { s_hCpuUserValue,   lbl_x_l+lbl_w,  row0_y+stride,   val_w, kControlHeight },
-    { s_hCpuKernelLabel, lbl_x_l,        row0_y+2*stride, lbl_w, kControlHeight },
-    { s_hCpuKernelValue, lbl_x_l+lbl_w,  row0_y+2*stride, val_w, kControlHeight },
-    { s_hCpuUsageLabel,  lbl_x_l,        row0_y+3*stride, lbl_w, kControlHeight },
-    { s_hCpuUsageValue,  lbl_x_l+lbl_w,  row0_y+3*stride, val_w, kControlHeight },
-    { s_hRamLabel,       lbl_x_r,        row0_y,          lbl_w, kControlHeight },
-    { s_hRamValue,       lbl_x_r+lbl_w,  row0_y,          val_w, kControlHeight },
-    { s_hPfLabel,        lbl_x_r,        row0_y+stride,   lbl_w, kControlHeight },
-    { s_hPfValue,        lbl_x_r+lbl_w,  row0_y+stride,   val_w, kControlHeight },
-    { s_hCacheLabel,     lbl_x_r,        row0_y+2*stride, lbl_w, kControlHeight },
-    { s_hCacheValue,     lbl_x_r+lbl_w,  row0_y+2*stride, val_w, kControlHeight },
-    { s_hVmLabel,        lbl_x_r,        row0_y+3*stride, lbl_w, kControlHeight },
-    { s_hVmValue,        lbl_x_r+lbl_w,  row0_y+3*stride, val_w, kControlHeight },
+      {s_hCpuIdleLabel, lbl_x_l, row0_y, lbl_w, kControlHeight},
+      {s_hCpuIdleValue, lbl_x_l + lbl_w, row0_y, val_w, kControlHeight},
+      {s_hCpuUserLabel, lbl_x_l, row0_y + stride, lbl_w, kControlHeight},
+      {s_hCpuUserValue, lbl_x_l + lbl_w, row0_y + stride, val_w, kControlHeight},
+      {s_hCpuKernelLabel, lbl_x_l, row0_y + 2 * stride, lbl_w, kControlHeight},
+      {s_hCpuKernelValue, lbl_x_l + lbl_w, row0_y + 2 * stride, val_w, kControlHeight},
+      {s_hCpuUsageLabel, lbl_x_l, row0_y + 3 * stride, lbl_w, kControlHeight},
+      {s_hCpuUsageValue, lbl_x_l + lbl_w, row0_y + 3 * stride, val_w, kControlHeight},
+      {s_hRamLabel, lbl_x_r, row0_y, lbl_w, kControlHeight},
+      {s_hRamValue, lbl_x_r + lbl_w, row0_y, val_w, kControlHeight},
+      {s_hPfLabel, lbl_x_r, row0_y + stride, lbl_w, kControlHeight},
+      {s_hPfValue, lbl_x_r + lbl_w, row0_y + stride, val_w, kControlHeight},
+      {s_hCacheLabel, lbl_x_r, row0_y + 2 * stride, lbl_w, kControlHeight},
+      {s_hCacheValue, lbl_x_r + lbl_w, row0_y + 2 * stride, val_w, kControlHeight},
+      {s_hVmLabel, lbl_x_r, row0_y + 3 * stride, lbl_w, kControlHeight},
+      {s_hVmValue, lbl_x_r + lbl_w, row0_y + 3 * stride, val_w, kControlHeight},
   };
   for (const auto& e : entries) {
     if (hdwp != nullptr && e.hw != nullptr) {

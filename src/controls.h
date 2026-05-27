@@ -55,7 +55,7 @@ void ClearOutput();
 // chose for the threads combo (based on GetLogicalProcessorCount).
 // main.cc reads these after CreateChildControls to seed s_prev_threads_sel
 // and s_threads_custom_injected.
-int  GetInitialThreadsSel();
+int GetInitialThreadsSel();
 bool IsInitialThreadsCustomInjected();
 
 // Reads the current selection from the digits / threads combos and

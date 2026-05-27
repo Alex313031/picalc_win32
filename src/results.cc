@@ -225,9 +225,9 @@ void ToggleResultWindow(HWND parent) {
       std::max(vy, std::min(static_cast<int>(mainRc.top), vy + vh - kResultWindowHeight));
 
   const std::wstring title = std::wstring(kResultPopupTitle) + L" - " + kResultsFile;
-  s_result_hwnd = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW, kResultWindowClassName, title.c_str(), style, pos_x, pos_y,
-                                  kResultWindowWidth, kResultWindowHeight, s_hidden_owner, nullptr,
-                                  g_hInstance, nullptr);
+  s_result_hwnd = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW, kResultWindowClassName, title.c_str(),
+                                  style, pos_x, pos_y, kResultWindowWidth, kResultWindowHeight,
+                                  s_hidden_owner, nullptr, g_hInstance, nullptr);
   if (s_result_hwnd == nullptr) {
     return;
   }

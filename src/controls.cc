@@ -22,8 +22,8 @@ static bool s_dragging  = false;
 
 // Set by CreateChildControls; read by main.cc to seed s_prev_threads_sel
 // and s_threads_custom_injected after controls are created.
-static int  s_initial_threads_sel              = 0;
-static bool s_initial_threads_custom_injected  = false;
+static int s_initial_threads_sel              = 0;
+static bool s_initial_threads_custom_injected = false;
 
 // Group box that frames the top-pane controls. Sized in LayoutChildren
 // since its bottom edge tracks the splitter position.
@@ -301,12 +301,11 @@ bool CreateChildControls(HWND parent) {
   SendMessageW(hDigitsCombo, CB_SETCURSEL, 5, 0);
 
   // Default thread selection: exact logical CPU count, clamped to kMaxNumThreads.
-  const DWORD cpu_count =
-      std::min(static_cast<DWORD>(kMaxNumThreads), GetLogicalProcessorCount());
+  const DWORD cpu_count = std::min(static_cast<DWORD>(kMaxNumThreads), GetLogicalProcessorCount());
 
   // Check for an exact match in the non-Custom entries.
   const int kNonCustomCount = static_cast<int>(ARRAYSIZE(kThreadsOptions)) - 1;
-  int threads_sel = -1;
+  int threads_sel           = -1;
   for (int i = 0; i < kNonCustomCount; ++i) {
     if (static_cast<DWORD>(wcstoul(kThreadsOptions[i], nullptr, 10)) == cpu_count) {
       threads_sel = i;
@@ -322,10 +321,8 @@ bool CreateChildControls(HWND parent) {
     // CPU count isn't a standard option — inject it before "Custom".
     wchar_t cpu_str[16];
     swprintf(cpu_str, ARRAYSIZE(cpu_str), L"%u", cpu_count);
-    const int insert_at =
-        static_cast<int>(SendMessageW(hThreadsCombo, CB_GETCOUNT, 0, 0)) - 1;
-    SendMessageW(hThreadsCombo, CB_INSERTSTRING, insert_at,
-                 reinterpret_cast<LPARAM>(cpu_str));
+    const int insert_at = static_cast<int>(SendMessageW(hThreadsCombo, CB_GETCOUNT, 0, 0)) - 1;
+    SendMessageW(hThreadsCombo, CB_INSERTSTRING, insert_at, reinterpret_cast<LPARAM>(cpu_str));
     SendMessageW(hThreadsCombo, CB_SETCURSEL, insert_at, 0);
     s_initial_threads_sel             = insert_at;
     s_initial_threads_custom_injected = true;
@@ -407,7 +404,7 @@ void LayoutChildren(HWND parent) {
 
   // Controls groupbox: kGroupMargin on left/right/bottom; frame line at
   // kGroupOuterTop, so the HWND top is kGroupHwndTop = kGroupOuterTop - kGroupMargin.
-  const int group_h      = splitter_top - kGroupMargin - kGroupHwndTop;
+  const int group_h = splitter_top - kGroupMargin - kGroupHwndTop;
   // Sysmon groupbox: same top/height, starts kGroupMargin past the controls
   // group's right edge and extends to kGroupMargin from the client right edge.
   const int sysmon_x = kGroupMargin + kControlsGroupWidth + kGroupMargin;
@@ -420,11 +417,11 @@ void LayoutChildren(HWND parent) {
   // Graph area: 7px (kGroupMargin) side/bottom padding, kGroupInnerPad from the
   // top frame line (matches the digits combo top). Fills the top half of the
   // inner content area; the bottom half is reserved for metrics labels.
-  const int graph_x  = sysmon_x + kGroupMargin;
-  const int graph_y  = kGroupOuterTop + kGroupInnerPad;
-  const int graph_w  = sysmon_w - 2 * kGroupMargin;
-  const int inner_h  = group_h - 2 * kGroupMargin - kGroupInnerPad;
-  const int graph_h  = inner_h / 2;
+  const int graph_x = sysmon_x + kGroupMargin;
+  const int graph_y = kGroupOuterTop + kGroupInnerPad;
+  const int graph_w = sysmon_w - 2 * kGroupMargin;
+  const int inner_h = group_h - 2 * kGroupMargin - kGroupInnerPad;
+  const int graph_h = inner_h / 2;
 
   const HWND hSysmonGroup = GetSysmonGroupHwnd();
   const HWND hGraph       = GetGraphHwnd();

@@ -12,8 +12,8 @@ struct MemStats {
   ULONGLONG pf_limit;    // commit limit: RAM + pagefile combined (bytes)
   ULONGLONG vm_used;     // same as pf_used (commit charge = virtual memory committed)
   ULONGLONG vm_limit;    // same as pf_limit (commit limit)
-  SIZE_T    cache_bytes; // system file cache current working-set size (bytes)
-  SIZE_T    cache_peak;  // system file cache peak working-set size (bytes)
+  SIZE_T cache_bytes;    // system file cache current working-set size (bytes)
+  SIZE_T cache_peak;     // system file cache peak working-set size (bytes)
   ULONGLONG cache_limit; // MaximumWorkingSet from SYSTEM_FILECACHE_INFORMATION;
                          // equals (ULONGLONG)(SIZE_T)-1 when OS-managed (no fixed cap)
 };

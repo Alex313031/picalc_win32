@@ -53,11 +53,11 @@ static UINT s_sysmon_speed = kMedSpeed;
 // Double-buffer for the main window's top pane. Created lazily in WM_PAINT,
 // resized on WM_SIZE, freed in WM_DESTROY. Eliminates the grey-flash flicker
 // caused by the parent painting under children before they repaint.
-static HDC     s_main_memDC     = nullptr;
+static HDC s_main_memDC         = nullptr;
 static HBITMAP s_main_memBmp    = nullptr;
 static HBITMAP s_main_oldMemBmp = nullptr;
-static int     s_main_mem_cx    = 0;
-static int     s_main_mem_cy    = 0;
+static int s_main_mem_cx        = 0;
+static int s_main_mem_cy        = 0;
 
 static void DestroyMainBackbuffer() {
   if (s_main_memBmp != nullptr) {
@@ -124,7 +124,7 @@ bool can_use_582_controls = false;
 
 COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE); // Standard grey background
 
-bool is_on_wine = false; // Whether we are on wine
+bool is_on_wine            = false; // Whether we are on wine
 static std::string winever = "";
 
 // =========================================================================
@@ -342,7 +342,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   if (argv != nullptr) {
     LocalFree(argv);
   }
-  timeBeginPeriod(kTimerResolution); // raise system timer resolution to 1ms for accurate sysmon ticks
+  timeBeginPeriod(
+      kTimerResolution); // raise system timer resolution to 1ms for accurate sysmon ticks
   // Open a conhost window when we have anything text-y to show. Without
   // any of these flags, the log sink defaults to LOG_NONE - LOG() calls
   // become near-no-ops, useful in release.
@@ -442,8 +443,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
         const HWND focused = GetFocus();
         if ((focused == hDigitsCombo || focused == hThreadsCombo) &&
             !SendMessageW(focused, CB_GETDROPPEDSTATE, 0, 0)) {
-          SendMessageW(mainHwnd, WM_COMMAND,
-                       MAKEWPARAM(IDC_START_BUTTON, BN_CLICKED),
+          SendMessageW(mainHwnd, WM_COMMAND, MAKEWPARAM(IDC_START_BUTTON, BN_CLICKED),
                        reinterpret_cast<LPARAM>(hStartButton));
           continue;
         }
@@ -586,8 +586,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         LOG(ERROR) << L"Failed to create child controls!";
         return -1;
       }
-      s_prev_threads_sel         = GetInitialThreadsSel();
-      s_threads_custom_injected  = IsInitialThreadsCustomInjected();
+      s_prev_threads_sel        = GetInitialThreadsSel();
+      s_threads_custom_injected = IsInitialThreadsCustomInjected();
       InitApp(hWnd);
       SetFocus(hStartButton);
       break;
@@ -667,13 +667,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         FillRectWithColor(s_main_memDC, mem_rc, g_bkg_color);
 
         for (HWND child = GetWindow(hWnd, GW_CHILD); child != nullptr;
-             child = GetWindow(child, GW_HWNDNEXT)) {
-          if (child == hSplitter || child == hOutputEdit) continue;
-          if (!IsWindowVisible(child)) continue;
+             child      = GetWindow(child, GW_HWNDNEXT)) {
+          if (child == hSplitter || child == hOutputEdit) {
+            continue;
+          }
+          if (!IsWindowVisible(child)) {
+            continue;
+          }
           RECT cr;
           GetWindowRect(child, &cr);
           MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&cr), 2);
-          if (cr.top >= top_h) continue;
+          if (cr.top >= top_h) {
+            continue;
+          }
 
           const int saved = SaveDC(s_main_memDC);
           OffsetViewportOrgEx(s_main_memDC, cr.left, cr.top, nullptr);
