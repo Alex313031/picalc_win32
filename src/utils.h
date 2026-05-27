@@ -13,6 +13,14 @@ typedef void(WINAPI* RtlGetNtVersionNumbers_t)(DWORD* pNtMajorVersion,
                                                DWORD* pNtMinorVersion,
                                                DWORD* pNtBuildNumber);
 
+// Typedef for accessing the run dialog function 61
+typedef int(WINAPI* RUN_FILE_DLG_)(HWND hwndParent,
+                                   HICON hIcon,
+                                   LPCTSTR lpszWorkingDir,
+                                   LPCTSTR lpszTitle,
+                                   LPCTSTR lpszPrompt,
+                                   DWORD dwFlags);
+
 extern bool g_debug_mode;
 
 // Save client area as a .BMP photo, capturing moment menu was clicked. On
@@ -140,5 +148,8 @@ bool WriteLineToResultFile(const std::wstring& line);
 // Appends the 90-asterisk separator + CRLF to the result file,
 // matching the width used by PrintOutputSeparator().
 bool WriteSeparatorToResultFile();
+
+// Opens the system run dialog
+void OpenRunDialog(HWND hWnd);
 
 #endif // PICALCWIN32_UTILS_H_

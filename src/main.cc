@@ -18,8 +18,8 @@
 // Previous non-"Custom" selection for each combo, used to revert when the
 // user cancels the custom-input dialog. Initialised to the startup defaults
 // (index 5 = "1M" for digits, index 1 = "2" for threads).
-static int  s_prev_digits_sel         = 5;
-static int  s_prev_threads_sel        = 1;
+static int s_prev_digits_sel          = 5;
+static int s_prev_threads_sel         = 1;
 static bool s_digits_custom_injected  = false;
 static bool s_threads_custom_injected = false;
 
@@ -47,21 +47,21 @@ static bool s_was_minimized = false;
 // Globals
 // =========================================================================
 
-HWND mainHwnd      = nullptr;
-HWND hOutputEdit   = nullptr;
-HWND hSplitter     = nullptr;
-HWND hDigitsLabel  = nullptr;
-HWND hDigitsCombo  = nullptr;
-HWND hThreadsLabel = nullptr;
-HWND hThreadsCombo = nullptr;
-HWND hStartButton        = nullptr;
-HWND hStopButton         = nullptr;
-HWND hOpenOutButton      = nullptr;
-HWND hClearResultButton  = nullptr;
-HWND hClearOutputButton  = nullptr;
-HWND hAboutButton        = nullptr;
-HWND hConsoleButton  = nullptr;
-HWND hExitButton     = nullptr;
+HWND mainHwnd           = nullptr;
+HWND hOutputEdit        = nullptr;
+HWND hSplitter          = nullptr;
+HWND hDigitsLabel       = nullptr;
+HWND hDigitsCombo       = nullptr;
+HWND hThreadsLabel      = nullptr;
+HWND hThreadsCombo      = nullptr;
+HWND hStartButton       = nullptr;
+HWND hStopButton        = nullptr;
+HWND hOpenOutButton     = nullptr;
+HWND hClearResultButton = nullptr;
+HWND hClearOutputButton = nullptr;
+HWND hAboutButton       = nullptr;
+HWND hConsoleButton     = nullptr;
+HWND hExitButton        = nullptr;
 
 HINSTANCE g_hInstance = nullptr;
 
@@ -75,7 +75,7 @@ std::atomic<bool> g_running(false);
 // before playing the completion chime. Initial value matches the .rc's
 // CHECKED flag (true); ApplyMenuDefaults latches the .rc state into it
 // at startup and the IDM_SOUND handler keeps it in sync on toggle.
-bool g_sound_on = true;
+bool g_sound_on       = true;
 bool g_colored_output = false;
 
 bool g_debug_mode = is_debug;
@@ -108,10 +108,10 @@ static void ApplyMenuDefaults(HWND hWnd);
 struct CustomInputParams {
   const wchar_t* title;
   const wchar_t* prompt;
-  UINT           min_val;
-  UINT           max_val;
-  UINT           edit_limit;  // max characters the edit control accepts
-  UINT           result;      // written on IDOK
+  UINT min_val;
+  UINT max_val;
+  UINT edit_limit; // max characters the edit control accepts
+  UINT result;     // written on IDOK
 };
 
 // =========================================================================
@@ -154,8 +154,8 @@ bool InitWindow(HINSTANCE hInstance, LPCWSTR className, LPCWSTR title, int iCmdS
   // WS_CLIPCHILDREN keeps the parent's WM_PAINT from drawing through
   // child windows (output edit + splitter), eliminating the grey
   // flash on resize.
-  static constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
-                                 WS_MAXIMIZEBOX | WS_SIZEBOX;
+  static constexpr DWORD style =
+      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX;
 
   // Create main window
   mainHwnd = CreateWindowExW(exStyle, className, title, style, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -315,8 +315,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // Open a conhost window when we have anything text-y to show. Without
   // any of these flags, the log sink defaults to LOG_NONE - LOG() calls
   // become near-no-ops, useful in release.
-  const bool open_console = g_debug_mode || g_show_version || g_show_help;
-  logging::LogDest kLogSink = logging::LOG_TO_ALL;
+  static const bool console_only      = g_show_version || g_show_help;
+  logging::LogDest kLogSink           = console_only ? logging::LOG_TO_STDERR : logging::LOG_TO_ALL;
   static const std::wstring file_name = std::wstring(INTERNAL_NAME);
   const std::wstring kLogFile         = file_name + L".log";
   logging::LogInitSettings LoggingSettings;
@@ -385,9 +385,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     // this guard Escape would reach the main window's confirm-exit path
     // even when the user intends to close only the viewer.
     const HWND result_hwnd = GetResultHwnd();
-    const bool for_result  = (result_hwnd != nullptr) &&
-                             (msg.hwnd == result_hwnd ||
-                              IsChild(result_hwnd, msg.hwnd));
+    const bool for_result =
+        (result_hwnd != nullptr) && (msg.hwnd == result_hwnd || IsChild(result_hwnd, msg.hwnd));
     if (for_result) {
       // Escape closes the viewer; all other keys dispatch normally.
       if (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE) {
@@ -449,33 +448,40 @@ static INT_PTR CALLBACK CustomInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
       GetCursorPos(&cursor_pt);
       RECT dlg_rect;
       GetWindowRect(hDlg, &dlg_rect);
-      const int dlg_w   = dlg_rect.right  - dlg_rect.left;
-      const int dlg_h   = dlg_rect.bottom - dlg_rect.top;
+      const int dlg_w    = dlg_rect.right - dlg_rect.left;
+      const int dlg_h    = dlg_rect.bottom - dlg_rect.top;
       const int screen_w = GetSystemMetrics(SM_CXSCREEN);
       const int screen_h = GetSystemMetrics(SM_CYSCREEN);
-      int dlg_x = cursor_pt.x;
-      int dlg_y = cursor_pt.y + 4;  // slight offset so cursor doesn't overlap the title bar
-      if (dlg_x + dlg_w > screen_w) dlg_x = screen_w - dlg_w;
-      if (dlg_y + dlg_h > screen_h) dlg_y = screen_h - dlg_h;
-      if (dlg_x < 0) dlg_x = 0;
-      if (dlg_y < 0) dlg_y = 0;
+      int dlg_x          = cursor_pt.x;
+      int dlg_y          = cursor_pt.y + 4; // slight offset so cursor doesn't overlap the title bar
+      if (dlg_x + dlg_w > screen_w) {
+        dlg_x = screen_w - dlg_w;
+      }
+      if (dlg_y + dlg_h > screen_h) {
+        dlg_y = screen_h - dlg_h;
+      }
+      if (dlg_x < 0) {
+        dlg_x = 0;
+      }
+      if (dlg_y < 0) {
+        dlg_y = 0;
+      }
       SetWindowPos(hDlg, nullptr, dlg_x, dlg_y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
       SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
-      return FALSE;  // FALSE because we set focus manually
+      return FALSE; // FALSE because we set focus manually
     }
     case WM_COMMAND: {
       const int ctrl = LOWORD(wParam);
       if (ctrl == IDOK) {
-        auto* params = reinterpret_cast<CustomInputParams*>(
-            GetWindowLongPtrW(hDlg, DWLP_USER));
+        auto* params    = reinterpret_cast<CustomInputParams*>(GetWindowLongPtrW(hDlg, DWLP_USER));
         wchar_t buf[32] = {};
         GetDlgItemTextW(hDlg, IDC_CUSTOM_EDIT, buf, 32);
-        wchar_t* end = nullptr;
+        wchar_t* end            = nullptr;
         const unsigned long val = wcstoul(buf, &end, 10);
         if (end == buf || *end != L'\0' || val < params->min_val || val > params->max_val) {
           wchar_t errmsg[128];
-          swprintf(errmsg, 128, L"Enter a whole number between %u and %u.",
-                   params->min_val, params->max_val);
+          swprintf(errmsg, 128, L"Enter a whole number between %u and %u.", params->min_val,
+                   params->max_val);
           WarnBox(hDlg, params->title, errmsg);
           SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
           SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETSEL, 0, -1);
@@ -543,7 +549,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       return TRUE;
     }
     case WM_GETMINMAXINFO: {
-      LPMINMAXINFO pMinMaxInfo = reinterpret_cast<LPMINMAXINFO>(lParam);
+      LPMINMAXINFO pMinMaxInfo      = reinterpret_cast<LPMINMAXINFO>(lParam);
       pMinMaxInfo->ptMinTrackSize.x = CW_MINWIDTH;
       pMinMaxInfo->ptMinTrackSize.y = CW_MINHEIGHT;
       const int MAXWIDTH            = GetSystemMetrics(SM_CXMAXIMIZED);
@@ -640,17 +646,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case IDC_DIGITS_COMBO:
         case IDC_THREADS_COMBO: {
-          if (HIWORD(wParam) != CBN_SELCHANGE) break;
-          HWND hCombo            = reinterpret_cast<HWND>(lParam);
-          const bool is_digits   = (command == IDC_DIGITS_COMBO);
-          const int  count       = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
-          const int  sel         = static_cast<int>(SendMessageW(hCombo, CB_GETCURSEL, 0, 0));
-          if (sel == CB_ERR) break;
+          if (HIWORD(wParam) != CBN_SELCHANGE) {
+            break;
+          }
+          HWND hCombo          = reinterpret_cast<HWND>(lParam);
+          const bool is_digits = (command == IDC_DIGITS_COMBO);
+          const int count      = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
+          const int sel        = static_cast<int>(SendMessageW(hCombo, CB_GETCURSEL, 0, 0));
+          if (sel == CB_ERR) {
+            break;
+          }
           // "Custom" is always the last item; anything else just updates the
           // previous-selection tracker so we know what to revert to on Cancel.
           if (sel != count - 1) {
-            if (is_digits) s_prev_digits_sel  = sel;
-            else           s_prev_threads_sel = sel;
+            if (is_digits) {
+              s_prev_digits_sel = sel;
+            } else {
+              s_prev_threads_sel = sel;
+            }
             break;
           }
           // "Custom" was selected — show the input dialog.
@@ -660,42 +673,43 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             params.prompt     = L"Enter number of digits:";
             params.min_val    = kMinNumDigits;
             params.max_val    = kMaxNumDigits;
-            params.edit_limit = 10;  // 1,000,000,000 = 10 digits
+            params.edit_limit = 10; // 1,000,000,000 = 10 digits
           } else {
             params.title      = L"Custom Thread Count";
             params.prompt     = L"Enter number of threads:";
             params.min_val    = kMinNumThreads;
             params.max_val    = kMaxNumThreads;
-            params.edit_limit = 3;   // 256 = 3 digits
+            params.edit_limit = 3; // 256 = 3 digits
           }
-          const INT_PTR res = DialogBoxParamW(
-              g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOM_INPUT),
-              hWnd, CustomInputDlgProc, reinterpret_cast<LPARAM>(&params));
+          const INT_PTR res =
+              DialogBoxParamW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOM_INPUT), hWnd,
+                              CustomInputDlgProc, reinterpret_cast<LPARAM>(&params));
           if (res == IDOK) {
             // Format the validated value and inject it just before "Custom".
             wchar_t val_str[32];
             swprintf(val_str, 32, L"%u", params.result);
             // Remove any previously injected custom item (always at count-2
             // when injected == true, because "Custom" stays last).
-            bool& injected = is_digits ? s_digits_custom_injected
-                                       : s_threads_custom_injected;
+            bool& injected = is_digits ? s_digits_custom_injected : s_threads_custom_injected;
             if (injected) {
-              const int cur_count = static_cast<int>(
-                  SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
+              const int cur_count = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
               SendMessageW(hCombo, CB_DELETESTRING, cur_count - 2, 0);
             }
-            const int insert_at = static_cast<int>(
-                SendMessageW(hCombo, CB_GETCOUNT, 0, 0)) - 1;
-            SendMessageW(hCombo, CB_INSERTSTRING, insert_at,
-                         reinterpret_cast<LPARAM>(val_str));
+            const int insert_at = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0)) - 1;
+            SendMessageW(hCombo, CB_INSERTSTRING, insert_at, reinterpret_cast<LPARAM>(val_str));
             SendMessageW(hCombo, CB_SETCURSEL, insert_at, 0);
             injected = true;
-            if (is_digits) s_prev_digits_sel  = insert_at;
-            else           s_prev_threads_sel = insert_at;
+            if (is_digits) {
+              s_prev_digits_sel = insert_at;
+            } else {
+              s_prev_threads_sel = insert_at;
+            }
           } else {
             // Revert to the last known good selection.
             const int prev = is_digits ? s_prev_digits_sel : s_prev_threads_sel;
-            if (prev >= 0) SendMessageW(hCombo, CB_SETCURSEL, prev, 0);
+            if (prev >= 0) {
+              SendMessageW(hCombo, CB_SETCURSEL, prev, 0);
+            }
           }
           break;
         }
@@ -728,8 +742,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (ConfirmClearResults(hWnd)) {
             if (!ClearResultFile()) {
               ErrorBox(hWnd, L"Results File Error", L"Failed to clear results file.");
+            } else {
+              ReloadResultWindow();
+              LOG(INFO) << L"Cleared result file " << kResultsFile;
             }
-            ReloadResultWindow();
           }
           break;
         case IDM_CLEAROUTPUT:
@@ -738,8 +754,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_CLEARLOG:
           if (!logging::ClearFileContents()) {
             ErrorBox(hWnd, L"Log File Error", L"Failed to clear log file.");
+          } else {
+            CLOG(INFO) << L"Cleared log file";
           }
           break;
+        case IDM_OPENLOG: {
+          const std::wstring logpath = logging::GetLogFilePath();
+          if (!logpath.empty()) {
+            ShellExecuteW(hWnd, L"open", logpath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+          } else {
+            CLOG(INFO) << L"Opened log file";
+          }
+          break;
+        }
         case IDM_SAVEAS: {
           std::wstring savepath;
           if (!SaveClientBitmap(hWnd, &savepath)) {
@@ -759,6 +786,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // CHECKED == Sounds on. Push into the global so picalc's
           // completion-chime check sees the new state.
           g_sound_on = ToggleMenuCheck(hWnd, IDM_SOUND);
+          // LOG(INFO) << L"Toggled sound " << g_sound_on ? L"on" : L"off";
           break;
         }
         case IDM_COLOREDOUTPUT: {
@@ -766,6 +794,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Force the output edit to repaint immediately.
           if (hOutputEdit != nullptr) {
             InvalidateRect(hOutputEdit, nullptr, TRUE);
+            // LOG(INFO) << L"Colored status pane " << g_colored_output ? L"on" : L"off";
+          } else {
+            LOG(ERROR) << L"No edit control to color!";
           }
           break;
         }
@@ -806,6 +837,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           UpdateConsoleToggleMenu(hWnd);
           break;
         }
+        case IDM_RUN:
+          OpenRunDialog(hWnd);
+          break;
         default:
           return DefWindowProcW(hWnd, message, wParam, lParam);
       }
@@ -817,16 +851,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       ShutDownApp();
       break;
     case WM_QUERYENDSESSION:
+      LOG(DEBUG) << L"Window station is going down now!";
       return TRUE;
     case WM_DESTROY:
-      PostQuitMessage(0);
+      // Close the result file
+      CloseResultFile();
+      PostQuitMessage(0); // WM_QUIT
       break;
     case WM_NCDESTROY:
       mainHwnd = nullptr;
-      // Last message this window will receive. Close the result file, log
-      // file, and console cleanly here, before the message loop sees the
-      // WM_QUIT that WM_DESTROY's PostQuitMessage queued.
-      CloseResultFile();
+      // Last message this window will receive. Close log file, and console
+      // cleanly here, before the message loop sees the WM_QUIT that
+      // WM_DESTROY's PostQuitMessage queued.
       logging::DeInitLogging(g_hInstance);
       break;
     case WM_PICALC_RELOAD_RESULTS:
@@ -881,6 +917,7 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
       if (g_sound_on) {
         PlayWav(IDR_NOTIFY_WAV);
       }
+      LOG(INFO) << L"Showed About dialog";
       return TRUE;
     case WM_CLOSE:
       EndDialog(hDlg, TRUE);

@@ -25,16 +25,17 @@ inline const wchar_t* const kExitButtonLabel  = L"Exit";
 inline const wchar_t* const kCntrlsGroupLabel = L"Controls";
 inline const wchar_t* const kSysmonGroupLabel = L"System Monitor";
 inline const wchar_t* const kResultPopupTitle = L"Pi Calculation Results";
+inline const wchar_t* const kRunTitle         = L"Create New Task";
+inline const wchar_t* const kRunPrompt =
+    L"Type the name of a program, folder, or file, and PiCalc will open it for you.";
 
 // Combobox items: Order = display order.
 inline const wchar_t* const kDigitOptions[] = {
-  // Digit-count options offered in the num digitscombobox.
-  L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"Custom"
-};
+    // Digit-count options offered in the num digitscombobox.
+    L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"Custom"};
 
 inline const wchar_t* const kThreadsOptions[] = {
-  // Threads options offered in the num cpu threads combobox.
-  L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"Custom"
-};
+    // Threads options offered in the num cpu threads combobox.
+    L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"Custom"};
 
 #endif // PICALCWIN32_STRINGS_H_

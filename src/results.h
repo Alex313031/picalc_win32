@@ -28,5 +28,4 @@ HWND GetResultHwnd();
 // No-op when the viewer is not open.
 void ReloadResultWindow();
 
-
-#endif  // PICALCWIN32_RESULTS_H_
+#endif // PICALCWIN32_RESULTS_H_

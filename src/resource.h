@@ -60,6 +60,14 @@
 #define IDC_CUSTOM_PROMPT           615 // Static label in custom-input dialog
 #define IDC_CUSTOM_EDIT             616 // Edit control in custom-input dialog
 
+#define IDC_CPUTOTAL                617 // Total CPU % usage
+#define IDC_CPUIDLE                 618 // Total CPU % Idle time
+#define IDC_CPUKERNEL               619 // Total Kernel CPU % usage
+#define IDC_RAMTOTAL                620 // Amount of RAM used / Total amount physically installed RAM
+#define IDC_PFTOTAL                 621 // Amount of page file used / Size of the page file
+#define IDC_VMTOTAL                 622 // Commit charge / Virtual Memory size: RAM + Pagefile space
+#define IDC_CACHETOTAL              623 // System cache usage / Set system cache size
+
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC
  #define IDC_STATIC                 -1

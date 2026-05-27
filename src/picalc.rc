@@ -80,9 +80,9 @@ BEGIN
         MENUITEM "Colored Status &Pane", IDM_COLOREDOUTPUT, CHECKED
         POPUP "&SysMon Speed"
         BEGIN
-            MENUITEM "Slow",   IDM_SLOW
-            MENUITEM "Medium", IDM_MED
-            MENUITEM "Fast",   IDM_FAST
+            MENUITEM "Slow (2.0s.)",   IDM_SLOW
+            MENUITEM "Medium (1.0s.)", IDM_MED, CHECKED
+            MENUITEM "Fast (0.5s.)",   IDM_FAST
         END
     END
     POPUP "&Dev"

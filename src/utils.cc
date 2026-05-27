@@ -6,6 +6,17 @@
 
 #include "globals.h"
 #include "resource.h"
+#include "strings.h"
+
+// For Run file dialog
+#define RFD_NOBROWSE        0x00000001
+#define RFD_NODEFFILE       0x00000002
+#define RFD_USEFULLPATHDIR  0x00000004
+#define RFD_NOSHOWOPEN      0x00000008
+#define RFD_WOW_APP         0x00000010
+#define RFD_NOSEPMEMORY_BOX 0x00000020
+
+static RUN_FILE_DLG_ pfnRunFileDlg = nullptr;
 
 // =========================================================================
 // Static forward declarations
@@ -123,11 +134,11 @@ bool SaveClientBitmap(HWND hWnd, std::wstring* outSavedPath) {
   }
 
   // ---- Write the BMP file. ----
-  const DWORD pixelDataOffset  = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+  const DWORD pixelDataOffset   = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
   BITMAPFILEHEADER bmp_file_hdr = {};
-  bmp_file_hdr.bfType          = 0x4D42; // 'BM' signature
-  bmp_file_hdr.bfSize          = pixelDataOffset + bmp_info.biSizeImage;
-  bmp_file_hdr.bfOffBits       = pixelDataOffset;
+  bmp_file_hdr.bfType           = 0x4D42; // 'BM' signature
+  bmp_file_hdr.bfSize           = pixelDataOffset + bmp_info.biSizeImage;
+  bmp_file_hdr.bfOffBits        = pixelDataOffset;
   HANDLE hFile =
       CreateFileW(szFile, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
@@ -164,10 +175,9 @@ HFONT GetFont(int size, std::wstring font, bool italic) {
     height = -size;
   }
   ReleaseDC(nullptr, hdc);
-  HFONT hGetFont =
-      CreateFontW(height, 0, 0, 0, FW_NORMAL, italic ? TRUE : FALSE, FALSE, FALSE,
-                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
-                  DEFAULT_PITCH | FF_DONTCARE, font.c_str());
+  HFONT hGetFont = CreateFontW(height, 0, 0, 0, FW_NORMAL, italic ? TRUE : FALSE, FALSE, FALSE,
+                               DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                               ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, font.c_str());
   if (hGetFont == nullptr) {
     LOG(ERROR) << L"failed to get " << font << L" font!";
     return nullptr;
@@ -374,8 +384,8 @@ static DWORD GetCommCtrlVersion() {
   if (pDllGetVersion == nullptr) {
     return 0x0;
   } else {
-    DLLVERSIONINFO dvi      = {sizeof(dvi)};
-    const HRESULT hresult   = pDllGetVersion(&dvi);
+    DLLVERSIONINFO dvi    = {sizeof(dvi)};
+    const HRESULT hresult = pDllGetVersion(&dvi);
     if (hresult == S_OK) {
       dwVersion = _PACKVERSION(dvi.dwMajorVersion, dvi.dwMinorVersion);
     }
@@ -440,9 +450,9 @@ bool ConfirmExit(HWND hWnd) {
 }
 
 bool ConfirmClearResults(HWND hWnd) {
-  const int clear_dialog = MessageBoxW(hWnd, L"Are you sure you want to clear the results file?",
-                                       L"Confirm Clear Results",
-                                       MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
+  const int clear_dialog =
+      MessageBoxW(hWnd, L"Are you sure you want to clear the results file?",
+                  L"Confirm Clear Results", MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
   return clear_dialog == IDYES;
 }
 
@@ -463,9 +473,9 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
     // a valid HMONITOR even for off-screen windows. rcWork excludes the
     // taskbar / docked appbars so the centred window doesn't end up half
     // under them.
-    HMONITOR hMon          = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+    HMONITOR hMon            = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO monitor_info = {};
-    monitor_info.cbSize    = sizeof(monitor_info);
+    monitor_info.cbSize      = sizeof(monitor_info);
     if (hMon == nullptr || !GetMonitorInfoW(hMon, &monitor_info)) {
       return false;
     }
@@ -493,8 +503,7 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
 const std::wstring GetWelcomeMessage() {
   std::wostringstream wostr;
   wostr << L"---- Welcome to " << GetAppName() << L" ----" << L"\n"
-        << L"       Version: " << GetVersionString()
-        << (is_debug ? L" DEBUG" : L"");
+        << L"       Version: " << GetVersionString() << (is_debug ? L" DEBUG" : L"");
   const std::wstring welcome = wostr.str();
   return welcome;
 }
@@ -520,9 +529,9 @@ bool OpenResultFile() {
   // FILE_SHARE_READ | FILE_SHARE_WRITE: the result viewer opens a second
   // read handle concurrently. Both sides must declare the same share set or
   // Wine's CreateFileW blocks instead of returning a sharing-violation error.
-  g_result_file = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS,
-                              FILE_ATTRIBUTE_NORMAL, nullptr);
+  g_result_file =
+      CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                  nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (g_result_file == INVALID_HANDLE_VALUE) {
     return false;
   }
@@ -542,8 +551,7 @@ bool AppendToResultFile(const wchar_t* data, size_t char_count) {
   }
   const DWORD byte_count = static_cast<DWORD>(char_count * sizeof(wchar_t));
   DWORD written          = 0;
-  return WriteFile(g_result_file, data, byte_count, &written, nullptr) &&
-         written == byte_count;
+  return WriteFile(g_result_file, data, byte_count, &written, nullptr) && written == byte_count;
 }
 
 bool AppendToResultFile(const std::wstring& text) {
@@ -595,7 +603,7 @@ LONGLONG GetResultFilePosition() {
   if (g_result_file == INVALID_HANDLE_VALUE) {
     return -1;
   }
-  LONG high      = 0;
+  LONG high       = 0;
   const DWORD low = SetFilePointer(g_result_file, 0, &high, FILE_CURRENT);
   if (low == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR) {
     return -1;
@@ -626,7 +634,6 @@ bool WriteSeparatorToResultFile() {
   return WriteLineToResultFile(kSep);
 }
 
-
 // One shot play of embedded .wav file
 bool PlayWav(UINT resid) {
   if (resid < IDR_MAIN) {
@@ -634,10 +641,36 @@ bool PlayWav(UINT resid) {
     return false;
   }
   static const DWORD playflags = SND_RESOURCE | SND_ASYNC | SND_NODEFAULT;
-  const bool played =
-      PlaySoundW(MAKEINTRESOURCEW(resid), g_hInstance, playflags);
+  const bool played            = PlaySoundW(MAKEINTRESOURCEW(resid), g_hInstance, playflags);
   if (!played) {
     LOG(ERROR) << L"Failed to play embedded .wav file " << resid;
   }
   return played;
+}
+
+// Opens the "Run" shell dialog from shell32.dll
+void OpenRunDialog(HWND hWnd) {
+  if (g_hInstance) {
+    static const HICON kRunDlgIcon = LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_WINFLAG));
+    if (kRunDlgIcon != nullptr) {
+      wchar_t szCurDir[MAX_PATH];
+      GetCurrentDirectoryW(MAX_PATH, szCurDir);
+      // Open "Run"
+      HMODULE hShell32Dll = GetModuleHandleW(L"shell32.dll");
+      if (hShell32Dll) {
+        pfnRunFileDlg = reinterpret_cast<RUN_FILE_DLG_>(GetProcAddress(hShell32Dll, (LPCSTR)(61)));
+        if (pfnRunFileDlg) {
+          LOG(INFO) << L"Opening RunFileDlg";
+          pfnRunFileDlg(hWnd, kRunDlgIcon, (LPWSTR)szCurDir, kRunTitle, kRunPrompt,
+                        RFD_USEFULLPATHDIR | RFD_WOW_APP);
+        } else {
+          LOG(ERROR) << L"Failed to open run dialog.";
+        }
+      } else {
+        LOG(ERROR) << L"Failed to get shell32.dll handle.";
+      }
+      DestroyIcon(kRunDlgIcon); // Cleanup icon
+    }
+    LOG(DEBUG) << L"Opened Run dialog";
+  }
 }

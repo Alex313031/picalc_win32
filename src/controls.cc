@@ -41,7 +41,7 @@ static LRESULT CALLBACK SplitterProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
       // lParam is in splitter-local client coords; translate to parent
       // client coords so we can store the absolute splitter top edge.
       POINT mouse_pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-      HWND parent = GetParent(hWnd);
+      HWND parent    = GetParent(hWnd);
       if (parent == nullptr) {
         return 0;
       }
@@ -72,9 +72,9 @@ static LRESULT CALLBACK SplitterProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
       const int splitter_w = splitter_rc.right - splitter_rc.left;
       const int splitter_h = splitter_rc.bottom - splitter_rc.top;
       const int hndl_x     = splitter_rc.left + (splitter_w - kSplitterHandleWidth) / 2;
-      const int hndl_y     = splitter_rc.top  + (splitter_h - kSplitterHandleHeight) / 2;
-      const RECT handle    = {hndl_x, hndl_y,
-                              hndl_x + kSplitterHandleWidth, hndl_y + kSplitterHandleHeight};
+      const int hndl_y     = splitter_rc.top + (splitter_h - kSplitterHandleHeight) / 2;
+      const RECT handle    = {hndl_x, hndl_y, hndl_x + kSplitterHandleWidth,
+                              hndl_y + kSplitterHandleHeight};
       FillRectWithColor(hdc, handle, kSplitterHandleColor);
       EndPaint(hWnd, &ps);
       return 0;
@@ -90,7 +90,7 @@ bool RegisterSplitterClass(HINSTANCE hInstance) {
   // back the original ATOM for a duplicate-but-identical registration
   // would be 0 with GetLastError = ERROR_CLASS_ALREADY_EXISTS. Treat
   // that as success so this function stays idempotent.
-  WNDCLASSEXW wnd_class = {};
+  WNDCLASSEXW wnd_class   = {};
   wnd_class.cbSize        = sizeof(wnd_class);
   wnd_class.style         = CS_HREDRAW | CS_VREDRAW;
   wnd_class.lpfnWndProc   = SplitterProc;
@@ -112,18 +112,17 @@ bool CreateChildControls(HWND parent) {
   // LayoutChildren places it correctly on the first WM_SIZE.
   static constexpr DWORD dwOutput =
       dwCHILD | WS_VSCROLL | WS_HSCROLL | ES_LEFT | ES_MULTILINE | ES_READONLY;
-  hOutputEdit = CreateWindowExW(
-      WS_EX_WINDOWEDGE, WC_EDIT, L"",
-      dwOutput | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
-      0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OUTPUT_EDIT)),
-      g_hInstance, nullptr);
+  hOutputEdit = CreateWindowExW(WS_EX_WINDOWEDGE, WC_EDIT, L"",
+                                dwOutput | ES_AUTOVSCROLL | ES_AUTOHSCROLL, 0, 0, 0, 0, parent,
+                                reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OUTPUT_EDIT)),
+                                g_hInstance, nullptr);
   if (hOutputEdit == nullptr) {
     return false;
   }
 
-  hSplitter = CreateWindowExW(
-      0, kSplitterClassName, L"", dwCHILD, 0, 0, 0, 0, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_SPLITTER)), g_hInstance, nullptr);
+  hSplitter = CreateWindowExW(0, kSplitterClassName, L"", dwCHILD, 0, 0, 0, 0, parent,
+                              reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_SPLITTER)),
+                              g_hInstance, nullptr);
   if (hSplitter == nullptr) {
     return false;
   }
@@ -132,8 +131,7 @@ bool CreateChildControls(HWND parent) {
   // in Z-order. Position is 0,0,0,0 here; LayoutChildren sizes it to
   // fill the top pane with a 7px margin on all sides.
   s_hGroupBox = CreateWindowExW(
-      0, WC_BUTTON, kCntrlsGroupLabel, dwCHILD | BS_GROUPBOX | WS_CLIPSIBLINGS,
-      0, 0, 0, 0, parent,
+      0, WC_BUTTON, kCntrlsGroupLabel, dwCHILD | BS_GROUPBOX | WS_CLIPSIBLINGS, 0, 0, 0, 0, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONTROLS_GROUP)), g_hInstance, nullptr);
   if (s_hGroupBox == nullptr) {
     return false;
@@ -156,33 +154,33 @@ bool CreateChildControls(HWND parent) {
   constexpr int kRowLeft     = kAreaCenterX - kRowWidth / 2;
   constexpr int kRowCol2     = kRowLeft + kLabelWidth + kHGap;
 
-  hDigitsLabel = CreateWindowExW(
-      0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
-      kRowLeft, row1_y, kLabelWidth, kControlHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)), g_hInstance, nullptr);
+  hDigitsLabel = CreateWindowExW(0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
+                                 kRowLeft, row1_y, kLabelWidth, kControlHeight, parent,
+                                 reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)),
+                                 g_hInstance, nullptr);
   if (hDigitsLabel == nullptr) {
     return false;
   }
 
   hDigitsCombo = CreateWindowExW(
-      0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
-      kRowCol2, row1_y, kComboWidth, kComboDropHeight, parent,
+      0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST, kRowCol2, row1_y,
+      kComboWidth, kComboDropHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_COMBO)), g_hInstance, nullptr);
   if (hDigitsCombo == nullptr) {
     return false;
   }
 
   hThreadsLabel = CreateWindowExW(
-      0, WC_STATIC, kNumThreadsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
-      kRowLeft, row2_y, kLabelWidth, kControlHeight, parent,
+      0, WC_STATIC, kNumThreadsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE, kRowLeft, row2_y,
+      kLabelWidth, kControlHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_LABEL)), g_hInstance, nullptr);
   if (hThreadsLabel == nullptr) {
     return false;
   }
 
   hThreadsCombo = CreateWindowExW(
-      0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST,
-      kRowCol2, row2_y, kComboWidth, kComboDropHeight, parent,
+      0, WC_COMBOBOX, L"", dwCHILD | WS_VSCROLL | WS_TABSTOP | CBS_DROPDOWNLIST, kRowCol2, row2_y,
+      kComboWidth, kComboDropHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_COMBO)), g_hInstance, nullptr);
   if (hThreadsCombo == nullptr) {
     return false;
@@ -192,16 +190,15 @@ bool CreateChildControls(HWND parent) {
   // the centering even though BS_PUSHBUTTON already centres by default.
   hStartButton = CreateWindowExW(
       0, WC_BUTTON, kStartButtonLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER | BS_DEFPUSHBUTTON,
-      kRowLeft, row3_y, kButtonWidth, kButtonHeight, parent,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER | BS_DEFPUSHBUTTON, kRowLeft,
+      row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_START_BUTTON)), g_hInstance, nullptr);
   if (hStartButton == nullptr) {
     return false;
   }
 
   hStopButton = CreateWindowExW(
-      0, WC_BUTTON, kStopButtonLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kStopButtonLabel, dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kRowCol2, row3_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_STOP_BUTTON)), g_hInstance, nullptr);
   if (hStopButton == nullptr) {
@@ -210,8 +207,7 @@ bool CreateChildControls(HWND parent) {
 
   // Row 4: Open Out File + Clear Results buttons.
   hOpenOutButton = CreateWindowExW(
-      0, WC_BUTTON, kOpenResultLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kOpenResultLabel, dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kRowLeft, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
   if (hOpenOutButton == nullptr) {
@@ -220,9 +216,9 @@ bool CreateChildControls(HWND parent) {
 
   hClearResultButton = CreateWindowExW(
       0, WC_BUTTON, kClearResultLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowCol2, row4_y, kButtonWidth, kButtonHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEARRESULT_BUTTON)), g_hInstance, nullptr);
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER, kRowCol2, row4_y, kButtonWidth,
+      kButtonHeight, parent, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEARRESULT_BUTTON)),
+      g_hInstance, nullptr);
   if (hClearResultButton == nullptr) {
     return false;
   }
@@ -230,35 +226,34 @@ bool CreateChildControls(HWND parent) {
   // Row 5: Clear Output + Console toggle buttons.
   hClearOutputButton = CreateWindowExW(
       0, WC_BUTTON, kClearOutputLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowLeft, row5_y, kButtonWidth, kButtonHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEAROUTPUT_BUTTON)), g_hInstance, nullptr);
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER, kRowLeft, row5_y, kButtonWidth,
+      kButtonHeight, parent, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEAROUTPUT_BUTTON)),
+      g_hInstance, nullptr);
   if (hClearOutputButton == nullptr) {
     return false;
   }
 
   hConsoleButton = CreateWindowExW(
       0, WC_BUTTON, kShowConsoleLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowCol2, row5_y, kButtonWidth, kButtonHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONSOLE_BUTTON)), g_hInstance, nullptr);
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER, kRowCol2, row5_y, kButtonWidth,
+      kButtonHeight, parent, reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONSOLE_BUTTON)),
+      g_hInstance, nullptr);
   if (hConsoleButton == nullptr) {
     return false;
   }
 
   // Row 6: About + Exit buttons.
-  hAboutButton = CreateWindowExW(
-      0, WC_BUTTON, kAboutButtonLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowLeft, row6_y, kButtonWidth, kButtonHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)), g_hInstance, nullptr);
+  hAboutButton = CreateWindowExW(0, WC_BUTTON, kAboutButtonLabel,
+                                 dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+                                 kRowLeft, row6_y, kButtonWidth, kButtonHeight, parent,
+                                 reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_ABOUT_BUTTON)),
+                                 g_hInstance, nullptr);
   if (hAboutButton == nullptr) {
     return false;
   }
 
   hExitButton = CreateWindowExW(
-      0, WC_BUTTON, kExitButtonLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      0, WC_BUTTON, kExitButtonLabel, dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kRowCol2, row6_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_EXIT_BUTTON)), g_hInstance, nullptr);
   if (hExitButton == nullptr) {
@@ -268,19 +263,18 @@ bool CreateChildControls(HWND parent) {
   // Apply the standard GUI font to every control. Without this they
   // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
   // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
-  const HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-  const HWND kFontTargets[] = {s_hGroupBox,        hDigitsLabel,       hDigitsCombo,
-                               hThreadsLabel,      hThreadsCombo,      hStartButton,
-                               hStopButton,        hOpenOutButton,     hConsoleButton,
-                               hClearResultButton, hClearOutputButton, hAboutButton,
-                               hExitButton};
+  const HFONT hGuiFont      = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  const HWND kFontTargets[] = {
+      s_hGroupBox,        hDigitsLabel, hDigitsCombo,   hThreadsLabel,  hThreadsCombo,
+      hStartButton,       hStopButton,  hOpenOutButton, hConsoleButton, hClearResultButton,
+      hClearOutputButton, hAboutButton, hExitButton};
   for (HWND hCtrl : kFontTargets) {
     SendMessageW(hCtrl, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
   }
   // Output pane uses old style font
-  static const HFONT hOutputFont =
-      reinterpret_cast<HFONT>(GetStockObject(SYSTEM_FONT));
-  SendMessageW(hOutputEdit, WM_SETFONT, reinterpret_cast<WPARAM>(hOutputFont), MAKELPARAM(FALSE, 0));
+  static const HFONT hOutputFont = reinterpret_cast<HFONT>(GetStockObject(SYSTEM_FONT));
+  SendMessageW(hOutputEdit, WM_SETFONT, reinterpret_cast<WPARAM>(hOutputFont),
+               MAKELPARAM(FALSE, 0));
 
   for (const wchar_t* opt : kDigitOptions) {
     SendMessageW(hDigitsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
@@ -289,7 +283,7 @@ bool CreateChildControls(HWND parent) {
     SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
   }
   // Default selections: 1M digits (index 5), 2 threads (index 1).
-  SendMessageW(hDigitsCombo,  CB_SETCURSEL, 5, 0);
+  SendMessageW(hDigitsCombo, CB_SETCURSEL, 5, 0);
   SendMessageW(hThreadsCombo, CB_SETCURSEL, 1, 0);
 
   return true;
@@ -305,9 +299,15 @@ int GetClampedSplitterY(int client_h) {
   }
   const int min_y = kMinTopHeight;
   const int max_y = client_h - kMinBottomHeight - kSplitterHeight;
-  if (max_y < min_y) return min_y;
-  if (s_splitter_y < min_y) return min_y;
-  if (s_splitter_y > max_y) return max_y;
+  if (max_y < min_y) {
+    return min_y;
+  }
+  if (s_splitter_y < min_y) {
+    return min_y;
+  }
+  if (s_splitter_y > max_y) {
+    return max_y;
+  }
   return s_splitter_y;
 }
 
@@ -336,8 +336,8 @@ void LayoutChildren(HWND parent) {
   // Otherwise shrinking the window past the user's splitter Y would
   // overwrite their preference, so growing the window again wouldn't
   // restore the original position.
-  const int min_y = kMinTopHeight;
-  const int max_y = client_h - kMinBottomHeight - kSplitterHeight;
+  const int min_y  = kMinTopHeight;
+  const int max_y  = client_h - kMinBottomHeight - kSplitterHeight;
   int splitter_top = s_splitter_y;
   if (max_y < min_y) {
     // Window is too small for both panes + splitter at minimum
@@ -358,8 +358,8 @@ void LayoutChildren(HWND parent) {
   // past the widest controls so the right side stays free for future widgets.
   constexpr int kControlsRight = kPadLeft + kLabelWidth + kHGap + kComboWidth;
   constexpr int kGroupHwndTop  = kGroupOuterTop - kGroupMargin; // = 3
-  const int group_w = kControlsRight + kGroupMargin;
-  const int group_h = splitter_top - kGroupMargin - kGroupHwndTop;
+  const int group_w            = kControlsRight + kGroupMargin;
+  const int group_h            = splitter_top - kGroupMargin - kGroupHwndTop;
 
   // Batch all moves atomically via DeferWindowPos so the children
   // reposition in a single pass - no intermediate state is painted,
@@ -367,18 +367,15 @@ void LayoutChildren(HWND parent) {
   // during live resize.
   HDWP hdwp = BeginDeferWindowPos(3);
   if (hdwp != nullptr) {
-    hdwp = DeferWindowPos(hdwp, s_hGroupBox, nullptr,
-                          kGroupMargin, kGroupHwndTop, group_w, group_h,
+    hdwp = DeferWindowPos(hdwp, s_hGroupBox, nullptr, kGroupMargin, kGroupHwndTop, group_w, group_h,
                           SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (hdwp != nullptr) {
-    hdwp = DeferWindowPos(hdwp, hSplitter, nullptr,
-                          0, splitter_top, client_w, kSplitterHeight,
+    hdwp = DeferWindowPos(hdwp, hSplitter, nullptr, 0, splitter_top, client_w, kSplitterHeight,
                           SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (hdwp != nullptr) {
-    hdwp = DeferWindowPos(hdwp, hOutputEdit, nullptr,
-                          0, bottom_top, client_w, bottom_h,
+    hdwp = DeferWindowPos(hdwp, hOutputEdit, nullptr, 0, bottom_top, client_w, bottom_h,
                           SWP_NOZORDER | SWP_NOACTIVATE);
   }
   if (hdwp != nullptr) {
@@ -426,8 +423,7 @@ void SendOutputMessage(const std::wstring& msg) {
   const int len = GetWindowTextLengthW(hOutputEdit);
   SendMessageW(hOutputEdit, EM_SETSEL, static_cast<WPARAM>(len), static_cast<LPARAM>(len));
   const std::wstring line = NormalizeNewlines(msg) + L"\r\n";
-  SendMessageW(hOutputEdit, EM_REPLACESEL, FALSE,
-               reinterpret_cast<LPARAM>(line.c_str()));
+  SendMessageW(hOutputEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(line.c_str()));
   // EM_REPLACESEL on an ES_AUTOVSCROLL edit usually scrolls the new
   // text into view, but EM_SCROLLCARET makes the guarantee explicit
   // when the user has scrolled up to read earlier output.
@@ -465,6 +461,7 @@ void ClearOutput() {
   // was at startup (WM_CREATE).
   SetWindowTextW(hOutputEdit, L"");
   SendOutputMessage(GetWelcomeMessage());
+  LOG(INFO) << L"Cleared status pane";
 }
 
 // "10", "1K", "10M", "1,000" -> integer. Commas are skipped; a
@@ -474,7 +471,7 @@ static int ParseCountSuffixed(const std::wstring& s) {
   if (s == L"Custom") {
     return -1;
   }
-  long val = 0;
+  long val    = 0;
   wchar_t suf = 0;
   for (wchar_t ch : s) {
     if (ch >= L'0' && ch <= L'9') {

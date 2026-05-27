@@ -35,9 +35,9 @@ inline constexpr INT kResultWindowMinHeight = 100;
 // Splitter bar dimensions (height in px) and the minimum height either
 // pane (top controls / bottom output) is allowed to shrink to while
 // being dragged.
-inline constexpr INT     kSplitterHeight      = 10;
-inline constexpr INT     kSplitterHandleWidth = 14;
-inline constexpr INT     kSplitterHandleHeight = 1;
+inline constexpr INT kSplitterHeight           = 10;
+inline constexpr INT kSplitterHandleWidth      = 14;
+inline constexpr INT kSplitterHandleHeight     = 1;
 inline constexpr COLORREF kSplitterHandleColor = RGB_GREY;
 
 // Default to a 1/2 top, 1/2 bottom pane split on first layout.
@@ -45,9 +45,10 @@ inline constexpr COLORREF kSplitterHandleColor = RGB_GREY;
 inline constexpr float kTopPaneFraction = 1.0f / 2.0f;
 
 // Top-pane control layout (in pixels, relative to the parent client area).
-inline constexpr INT kGroupMargin   = 7;   // groupbox outer margin: left, right, bottom
-inline constexpr INT kGroupOuterTop = 10;  // groupbox outer margin: top (distance from client top to frame line)
-inline constexpr INT kGroupInnerPad = 14;  // inner padding: frame line → first control row
+inline constexpr INT kGroupMargin = 7; // groupbox outer margin: left, right, bottom
+inline constexpr INT kGroupOuterTop =
+    10; // groupbox outer margin: top (distance from client top to frame line)
+inline constexpr INT kGroupInnerPad = 14; // inner padding: frame line → first control row
 inline constexpr INT kPadLeft       = 14;
 inline constexpr INT kPadTop        = 14;
 inline constexpr INT kHGap          = 5;
@@ -70,11 +71,9 @@ inline constexpr INT kComboDropHeight = 200;
 //   + last row height                 = kButtonHeight
 //   + inner bottom pad (frame gap)    = kVGap
 //   + outer bottom margin             = kGroupMargin
-inline constexpr INT kMinTopHeight =
-    (kGroupOuterTop + kGroupInnerPad) +
-    (kControlHeight + kPadTop) * 2 +
-    (kButtonHeight  + kVGap)   * 3 +
-    kButtonHeight + kVGap + kGroupMargin;
+inline constexpr INT kMinTopHeight = (kGroupOuterTop + kGroupInnerPad) +
+                                     (kControlHeight + kPadTop) * 2 + (kButtonHeight + kVGap) * 3 +
+                                     kButtonHeight + kVGap + kGroupMargin;
 
 // Minimum height of the output (bottom) pane.
 inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 3;
@@ -84,7 +83,7 @@ inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 3;
 // from actual window width at open time; see ComputeWrapWidth in results.cc.
 inline constexpr size_t kResultWrapWidth = 80u;
 
-inline constexpr UINT kMinNumDigits = 1u; // Min would be 3
+inline constexpr UINT kMinNumDigits = 1u;         // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 
 // Max digits shown in the output pane; anything beyond this is truncated and
@@ -92,15 +91,15 @@ inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 inline constexpr UINT kMaxPrintNumDigits = 32;
 
 // Maximum bytes that can be loaded into an edit control
-inline constexpr size_t kMaxEditLoadBytes = static_cast<size_t>(1024u * 1024u);  // 4 MB
+inline constexpr size_t kMaxEditLoadBytes = static_cast<size_t>(50u * 1024u * 1024u); // 50 MB
 
-inline constexpr UINT kMinNumThreads = 1u; // Need at least 1 thread
+inline constexpr UINT kMinNumThreads = 1u;   // Need at least 1 thread
 inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this
 
 // Custom WM_APP messages for cross-thread UI notifications.
 // Posted (never sent) from worker threads to mainHwnd so the UI thread
 // performs the actual window update, avoiding cross-thread SendMessage hangs.
-inline constexpr UINT WM_PICALC_RELOAD_RESULTS  = WM_APP + 1;
+inline constexpr UINT WM_PICALC_RELOAD_RESULTS = WM_APP + 1;
 
 // Child window style
 inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
@@ -109,5 +108,10 @@ inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 // See https://learn.microsoft.com/en-us/windows/win32/controls/common-control-versions
 inline constexpr DWORD dwComCtl32TargetVer =
     _PACKVERSION(static_cast<DWORD>(5u), static_cast<DWORD>(82u));
+
+// Delay in milliseconds for system monitor timer.
+inline constexpr unsigned long kSlowSpeed = 2000UL;
+inline constexpr unsigned long kMedSpeed  = 1000UL;
+inline constexpr unsigned long kHighSpeed = 500UL;
 
 #endif // PICALCWIN32_CONSTANTS_H_

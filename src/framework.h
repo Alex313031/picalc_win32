@@ -17,9 +17,10 @@
 #ifdef _MSC_VER
  #undef WIN32_NO_STATUS
 #endif
-#include <commctrl.h> // Common Controls
-#include <commdlg.h>  // Common dialogs
-#include <ntstatus.h> // Full NTSTATUS codes (e.g. STATUS_SUCCESS)
+#include <commctrl.h>  // Common Controls
+#include <commdlg.h>   // Common dialogs
+#include <shellapi.h>  // ShellExecuteW
+#include <ntstatus.h>  // Full NTSTATUS codes (e.g. STATUS_SUCCESS)
 
 // C Runtime Headers
 #include <tchar.h> // For TCHAR, and automatically deducing wchar_t type
