@@ -17,27 +17,32 @@
 #define IDD_CUSTOM_INPUT            131 // Custom digit/thread count input
 
 /* Menu items */
-#define IDM_ABOUT                   200
-#define IDM_EXIT                    201
-#define IDM_CEXIT                   202
-#define IDM_HELP                    203
-#define IDM_SAVEAS                  204
-#define IDM_CLEAROUTPUT             205
+#define IDM_ABOUT                   200 // About dialog
+#define IDM_EXIT                    201 // Exit immediately
+#define IDM_CEXIT                   202 // Exit confirmation
+#define IDM_HELP                    203 // Opens help
+#define IDM_SAVEAS                  204 // Saves client area screenshot
+#define IDM_CLEAROUTPUT             205 // Clears output pane
+#define IDM_RUN                     206 // "Run" dialog
+#define IDM_SLOW                    207 // Slow sysmon update speed
+#define IDM_MED                     208 // Med speed
+#define IDM_FAST                    209 // Fast speed
 
-#define IDM_SOUND                   250
-#define IDM_CONSOLE                 251
-#define IDM_CLEARRESULTS            252
-#define IDM_CLEARLOG                253
-#define IDM_COLOREDOUTPUT           254
+#define IDM_SOUND                   250 // Whether to enale sounds app-wide
+#define IDM_CONSOLE                 251 // Toggle console window
+#define IDM_CLEARRESULTS            252 // Clear results .txt file
+#define IDM_COLOREDOUTPUT           253 // Whether output pane is b/w or color
+#define IDM_CLEARLOG                254 // Clears the log file
+#define IDM_OPENLOG                 255 // Opens log file with notepad
 
 // Embedded background sound WAV files
-#define IDR_TADA_WAV                500
-#define IDR_OHNO_WAV                501
-#define IDR_NOTIFY_WAV              502
+#define IDR_TADA_WAV                500 // "Tada" sound when calculation complete
+#define IDR_OHNO_WAV                501 // "Oh No!" sound from ImgBurn, when calculation fails or is interrupted
+#define IDR_NOTIFY_WAV              502 // Win2K ding sound, used for about dialog notify sound
 
 /* Child control IDs */
-#define IDC_OUTPUT_EDIT             600
-#define IDC_SPLITTER                601
+#define IDC_OUTPUT_EDIT             600 // Output status pane
+#define IDC_SPLITTER                601 // Splitter bar
 #define IDC_DIGITS_LABEL            602
 #define IDC_DIGITS_COMBO            603
 #define IDC_THREADS_LABEL           604

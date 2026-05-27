@@ -2,7 +2,6 @@
 
 #include "utils.h"
 
-#include <shellapi.h>
 #include <shlwapi.h>
 
 #include "globals.h"
@@ -146,14 +145,34 @@ bool SaveClientBitmap(HWND hWnd, std::wstring* outSavedPath) {
 }
 
 HFONT GetFont(int size, std::wstring font, bool italic) {
+  HDC hdc = GetDC(nullptr);
+  if (!hdc) {
+    return nullptr;
+  }
+  if (font.empty()) {
+    LOG(ERROR) << L"Empty font supplied!";
+  }
   // Negative height = "character height" in logical units (the cap
   // box), so passing -size yields ~size-pixel-tall glyphs on a
   // standard MM_TEXT DC. ANTIALIASED_QUALITY keeps big text from
   // looking jagged - the rest of the app embraces a retro aliased
   // look but 72-px text without smoothing is unreadable.
-  return CreateFontW(-size, 0, 0, 0, FW_NORMAL, italic ? TRUE : FALSE, FALSE, FALSE,
-                     DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
-                     DEFAULT_PITCH | FF_DONTCARE, font.c_str());
+  int height;
+  if (size <= 0) {
+    height = -MulDiv(8, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+  } else {
+    height = -size;
+  }
+  ReleaseDC(nullptr, hdc);
+  HFONT hGetFont =
+      CreateFontW(height, 0, 0, 0, FW_NORMAL, italic ? TRUE : FALSE, FALSE, FALSE,
+                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+                  DEFAULT_PITCH | FF_DONTCARE, font.c_str());
+  if (hGetFont == nullptr) {
+    LOG(ERROR) << L"failed to get " << font << L" font!";
+    return nullptr;
+  }
+  return hGetFont;
 }
 
 bool FillRectWithColor(HDC hdc, const RECT& rc, COLORREF color) {
@@ -420,6 +439,13 @@ bool ConfirmExit(HWND hWnd) {
   return exit_dialog == IDYES;
 }
 
+bool ConfirmClearResults(HWND hWnd) {
+  const int clear_dialog = MessageBoxW(hWnd, L"Are you sure you want to clear the results file?",
+                                       L"Confirm Clear Results",
+                                       MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
+  return clear_dialog == IDYES;
+}
+
 bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
   if (hWnd == nullptr) {
     return false;
@@ -487,31 +513,25 @@ bool OpenResultFile() {
   if (path.length() >= MAX_PATH) {
     return false;
   }
-  // OPEN_ALWAYS: create if absent, open if present. FILE_ATTRIBUTE_NORMAL
-  // (no FILE_FLAG_WRITE_THROUGH) lets the OS buffer writes in the page
-  // cache - critical for sequential million-digit output where per-write
-  // kernel flushes would dominate wall time.
+  // CREATE_ALWAYS: each run starts with a fresh file — one result at a time.
+  // FILE_ATTRIBUTE_NORMAL (no FILE_FLAG_WRITE_THROUGH) lets the OS buffer
+  // writes in the page cache; critical for sequential million-digit output
+  // where per-write kernel flushes would dominate wall time.
+  // FILE_SHARE_READ | FILE_SHARE_WRITE: the result viewer opens a second
+  // read handle concurrently. Both sides must declare the same share set or
+  // Wine's CreateFileW blocks instead of returning a sharing-violation error.
   g_result_file = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
-                              FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS,
                               FILE_ATTRIBUTE_NORMAL, nullptr);
   if (g_result_file == INVALID_HANDLE_VALUE) {
     return false;
   }
-  if (GetLastError() == ERROR_ALREADY_EXISTS) {
-    // Existing file: seek to end so new results append after prior ones.
-    if (SetFilePointer(g_result_file, 0, nullptr, FILE_END) == INVALID_SET_FILE_POINTER &&
-        GetLastError() != NO_ERROR) {
-      CloseResultFile();
-      return false;
-    }
-  } else {
-    // New file: write UTF-16 LE BOM (FF FE).
-    static const WORD kBOM = 0xFEFF;
-    DWORD written          = 0;
-    if (!WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr)) {
-      CloseResultFile();
-      return false;
-    }
+  // Write UTF-16 LE BOM (FF FE) so readers know the encoding.
+  static const WORD kBOM = 0xFEFF;
+  DWORD written          = 0;
+  if (!WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr)) {
+    CloseResultFile();
+    return false;
   }
   return true;
 }
@@ -570,6 +590,32 @@ bool IsResultFileOpen() {
   return g_result_file != INVALID_HANDLE_VALUE;
 }
 
+// SetFilePointerEx is XP+; use SetFilePointer with LONG high for Win2k compat.
+LONGLONG GetResultFilePosition() {
+  if (g_result_file == INVALID_HANDLE_VALUE) {
+    return -1;
+  }
+  LONG high      = 0;
+  const DWORD low = SetFilePointer(g_result_file, 0, &high, FILE_CURRENT);
+  if (low == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR) {
+    return -1;
+  }
+  return (static_cast<LONGLONG>(high) << 32) | static_cast<LONGLONG>(low);
+}
+
+bool TruncateResultFileTo(LONGLONG position) {
+  if (g_result_file == INVALID_HANDLE_VALUE || position < 0) {
+    return false;
+  }
+  LONG high       = static_cast<LONG>(position >> 32);
+  const LONG low  = static_cast<LONG>(position & 0xFFFFFFFF);
+  const DWORD ret = SetFilePointer(g_result_file, low, &high, FILE_BEGIN);
+  if (ret == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR) {
+    return false;
+  }
+  return SetEndOfFile(g_result_file) != FALSE;
+}
+
 bool WriteLineToResultFile(const std::wstring& line) {
   return AppendToResultFile(line + L"\r\n");
 }
@@ -580,13 +626,6 @@ bool WriteSeparatorToResultFile() {
   return WriteLineToResultFile(kSep);
 }
 
-bool ShellOpenResultFile(HWND hWnd) {
-  const std::wstring path = GetExeDir() + kResultsFile;
-  const HINSTANCE res =
-      ShellExecuteW(hWnd, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-  // ShellExecuteW returns a value > 32 on success.
-  return reinterpret_cast<INT_PTR>(res) > 32;
-}
 
 // One shot play of embedded .wav file
 bool PlayWav(UINT resid) {

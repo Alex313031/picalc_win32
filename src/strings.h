@@ -16,14 +16,15 @@ inline const wchar_t* const kStartButtonLabel = L"Calculate!";
 inline const wchar_t* const kStopButtonLabel  = L"Stop";
 inline const wchar_t* const kShowConsoleLabel = L"Show Console";
 inline const wchar_t* const kHideConsoleLabel = L"Hide Console";
-inline const wchar_t* const kOpenResultLabel  = L"Open Results";
-inline const wchar_t* const kCloseResultLabel = L"Close Results";
+inline const wchar_t* const kOpenResultLabel  = L"Open Result File";
+inline const wchar_t* const kCloseResultLabel = L"Close Result File";
 inline const wchar_t* const kClearResultLabel = L"Clear Result File";
 inline const wchar_t* const kClearOutputLabel = L"Clear Status Pane";
 inline const wchar_t* const kAboutButtonLabel = L"About";
 inline const wchar_t* const kExitButtonLabel  = L"Exit";
 inline const wchar_t* const kCntrlsGroupLabel = L"Controls";
 inline const wchar_t* const kSysmonGroupLabel = L"System Monitor";
+inline const wchar_t* const kResultPopupTitle = L"Pi Calculation Results";
 
 // Combobox items: Order = display order.
 inline const wchar_t* const kDigitOptions[] = {

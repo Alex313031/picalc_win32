@@ -76,6 +76,9 @@ bool ToggleMenuCheck(HWND hWnd, UINT id);
 // Confirmation dialog for exit
 bool ConfirmExit(HWND hWnd);
 
+// Confirmation dialog before clearing the result file
+bool ConfirmClearResults(HWND hWnd);
+
 // Centers `hWnd` on screen. When `multimon` is true, uses
 // MonitorFromWindow + GetMonitorInfo so the window centres inside the
 // work area (minus the taskbar) of whichever monitor it currently sits
@@ -123,8 +126,13 @@ void CloseResultFile();
 // Returns true if the result file handle is currently open.
 bool IsResultFileOpen();
 
-// Opens the result file in the system default viewer via ShellExecuteW.
-bool ShellOpenResultFile(HWND hWnd);
+// Returns the current write position in the result file, or -1 on error.
+// Use before a calculation run to capture a rollback point.
+LONGLONG GetResultFilePosition();
+
+// Truncates the result file back to `position` and seeks there.
+// Used to discard an interrupted run's partial writes.
+bool TruncateResultFileTo(LONGLONG position);
 
 // Appends `line` + CRLF to the result file.
 bool WriteLineToResultFile(const std::wstring& line);

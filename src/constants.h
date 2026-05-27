@@ -15,6 +15,9 @@
 #define RGB_CYAN    RGB(0, 255, 255)
 #define RGB_MAGENTA RGB(255, 0, 255)
 
+// Output file name, written side-by-side with the .exe.
+inline constexpr wchar_t kResultsFile[] = L"picalc_results.txt";
+
 // Default desired outer window size at startup.
 inline constexpr INT CW_WIDTH  = 700;
 inline constexpr INT CW_HEIGHT = 600;
@@ -22,6 +25,12 @@ inline constexpr INT CW_HEIGHT = 600;
 // Min window size
 inline constexpr INT CW_MINWIDTH  = 480;
 inline constexpr INT CW_MINHEIGHT = 420;
+
+// Result viewer popup window default/min dimensions.
+inline constexpr INT kResultWindowWidth     = 500;
+inline constexpr INT kResultWindowHeight    = 600;
+inline constexpr INT kResultWindowMinWidth  = 200;
+inline constexpr INT kResultWindowMinHeight = 100;
 
 // Splitter bar dimensions (height in px) and the minimum height either
 // pane (top controls / bottom output) is allowed to shrink to while
@@ -68,7 +77,12 @@ inline constexpr INT kMinTopHeight =
     kButtonHeight + kVGap + kGroupMargin;
 
 // Minimum height of the output (bottom) pane.
-inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 2;
+inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 3;
+
+// Fallback wrap column for the result viewer used when the window width
+// cannot be measured (e.g. GetClientRect fails). Dynamic value computed
+// from actual window width at open time; see ComputeWrapWidth in results.cc.
+inline constexpr size_t kResultWrapWidth = 80u;
 
 inline constexpr UINT kMinNumDigits = 1u; // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
@@ -77,11 +91,16 @@ inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 // the full result is written to the result file only.
 inline constexpr UINT kMaxPrintNumDigits = 32;
 
-// Output file name, written side-by-side with the .exe.
-inline constexpr wchar_t kResultsFile[] = L"picalc_result.txt";
+// Maximum bytes that can be loaded into an edit control
+inline constexpr size_t kMaxEditLoadBytes = static_cast<size_t>(1024u * 1024u);  // 4 MB
 
 inline constexpr UINT kMinNumThreads = 1u; // Need at least 1 thread
 inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this
+
+// Custom WM_APP messages for cross-thread UI notifications.
+// Posted (never sent) from worker threads to mainHwnd so the UI thread
+// performs the actual window update, avoiding cross-thread SendMessage hangs.
+inline constexpr UINT WM_PICALC_RELOAD_RESULTS  = WM_APP + 1;
 
 // Child window style
 inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;

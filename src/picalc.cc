@@ -326,6 +326,9 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
   delete outer;
 
   OpenResultFile();
+  // Capture the file position before writing anything for this run so we
+  // can roll back cleanly if the calculation is stopped mid-way.
+  const LONGLONG run_start_pos = GetResultFilePosition();
   // Separator at top of results
   PrintOutputSeparator();
   WriteSeparatorToResultFile();
@@ -405,6 +408,7 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
   }
 
   if (StopRequested()) {
+    TruncateResultFileTo(run_start_pos);
     std::wostringstream stop_line;
     stop_line << kStoppedMessage << digits << L" digits.";
     EmitLine(stop_line.str(), false);
@@ -436,6 +440,7 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
   const DWORD elapsedMs = t_end - t_start;
 
   if (StopRequested()) {
+    TruncateResultFileTo(run_start_pos);
     std::wostringstream stop_line;
     stop_line << kStoppedMessage << digits << L" digits.";
     EmitLine(stop_line.str(), false);
@@ -468,6 +473,12 @@ DWORD WINAPI CalcThreadProc(LPVOID thread_param) {
   WriteLineToResultFile(std::wstring(L"Result: ") + outpi_full);
   // Flush after the potentially huge pi result
   const bool done = FlushResultFile();
+  // Notify the UI thread to refresh the result viewer. PostMessageW is used
+  // (not SendMessage / direct call) so the worker thread never blocks waiting
+  // for the UI thread to process the update — the hang root cause on Wine.
+  if (done) {
+    PostMessageW(mainHwnd, WM_PICALC_RELOAD_RESULTS, 0, 0);
+  }
 
   // Completion chime. Gated on the Settings -> Sound? menu via
   // g_sound_on. SND_ASYNC kicks playback off on a system thread so

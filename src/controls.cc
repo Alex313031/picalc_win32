@@ -208,7 +208,7 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
-  // Row 4: Open Out File + Console toggle buttons.
+  // Row 4: Open Out File + Clear Results buttons.
   hOpenOutButton = CreateWindowExW(
       0, WC_BUTTON, kOpenResultLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
@@ -218,31 +218,31 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
-  hConsoleButton = CreateWindowExW(
-      0, WC_BUTTON, kShowConsoleLabel,
-      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowCol2, row4_y, kButtonWidth, kButtonHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONSOLE_BUTTON)), g_hInstance, nullptr);
-  if (hConsoleButton == nullptr) {
-    return false;
-  }
-
-  // Row 5: Clear Results + Clear Output buttons.
   hClearResultButton = CreateWindowExW(
       0, WC_BUTTON, kClearResultLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowLeft, row5_y, kButtonWidth, kButtonHeight, parent,
+      kRowCol2, row4_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEARRESULT_BUTTON)), g_hInstance, nullptr);
   if (hClearResultButton == nullptr) {
     return false;
   }
 
+  // Row 5: Clear Output + Console toggle buttons.
   hClearOutputButton = CreateWindowExW(
       0, WC_BUTTON, kClearOutputLabel,
       dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
-      kRowCol2, row5_y, kButtonWidth, kButtonHeight, parent,
+      kRowLeft, row5_y, kButtonWidth, kButtonHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CLEAROUTPUT_BUTTON)), g_hInstance, nullptr);
   if (hClearOutputButton == nullptr) {
+    return false;
+  }
+
+  hConsoleButton = CreateWindowExW(
+      0, WC_BUTTON, kShowConsoleLabel,
+      dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
+      kRowCol2, row5_y, kButtonWidth, kButtonHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_CONSOLE_BUTTON)), g_hInstance, nullptr);
+  if (hConsoleButton == nullptr) {
     return false;
   }
 
@@ -268,7 +268,7 @@ bool CreateChildControls(HWND parent) {
   // Apply the standard GUI font to every control. Without this they
   // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
   // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
-  HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  const HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
   const HWND kFontTargets[] = {s_hGroupBox,        hDigitsLabel,       hDigitsCombo,
                                hThreadsLabel,      hThreadsCombo,      hStartButton,
                                hStopButton,        hOpenOutButton,     hConsoleButton,
@@ -277,6 +277,10 @@ bool CreateChildControls(HWND parent) {
   for (HWND hCtrl : kFontTargets) {
     SendMessageW(hCtrl, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
   }
+  // Output pane uses old style font
+  static const HFONT hOutputFont =
+      reinterpret_cast<HFONT>(GetStockObject(SYSTEM_FONT));
+  SendMessageW(hOutputEdit, WM_SETFONT, reinterpret_cast<WPARAM>(hOutputFont), MAKELPARAM(FALSE, 0));
 
   for (const wchar_t* opt : kDigitOptions) {
     SendMessageW(hDigitsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));

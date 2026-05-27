@@ -67,8 +67,7 @@ IDR_MAIN MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        MENUITEM "Clear &Results File", IDM_CLEARRESULTS
-        MENUITEM "&Clear Output",       IDM_CLEAROUTPUT
+        MENUITEM "&Run",                IDM_RUN
         MENUITEM SEPARATOR
         MENUITEM "&Save Screenshot",    IDM_SAVEAS
         MENUITEM SEPARATOR
@@ -78,10 +77,17 @@ BEGIN
     BEGIN
         MENUITEM "S&ound?",              IDM_SOUND, CHECKED
         MENUITEM "Colored Status &Pane", IDM_COLOREDOUTPUT, CHECKED
+        POPUP "&SysMon Speed"
+        BEGIN
+            MENUITEM "Slow",   IDM_SLOW
+            MENUITEM "Medium", IDM_MED
+            MENUITEM "Fast",   IDM_FAST
+        END
     END
     POPUP "&Dev"
     BEGIN
         MENUITEM "Toggle &Console", IDM_CONSOLE
+        MENUITEM "Open &Log File",  IDM_OPENLOG
         MENUITEM "Clear &Log File", IDM_CLEARLOG
     END
     POPUP "&About"

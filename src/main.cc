@@ -8,6 +8,7 @@
 #include "controls.h"
 #include "globals.h"
 #include "resource.h"
+#include "results.h"
 #include "strings.h"
 
 // =========================================================================
@@ -378,17 +379,34 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0)) {
-    // Accelerator first so menu shortcuts (Ctrl+Q, '?', etc.) win
-    // over any TAB/arrow handling. Then IsDialogMessageW gives us
-    // dialog-style navigation in the top pane (TAB / Shift+TAB
-    // between WS_TABSTOP controls, arrows inside combos, Enter for
-    // the default button) which a plain WM_KEYDOWN dispatch on a
-    // non-dialog window wouldn't.
-    if (TranslateAcceleratorW(mainHwnd, hAccel, &msg)) {
-      continue;
-    }
-    if (IsDialogMessageW(mainHwnd, &msg)) {
-      continue;
+    // Check whether this message is destined for the result viewer or one
+    // of its children (the edit control). TranslateAcceleratorW processes
+    // accelerators for ALL thread messages regardless of focus, so without
+    // this guard Escape would reach the main window's confirm-exit path
+    // even when the user intends to close only the viewer.
+    const HWND result_hwnd = GetResultHwnd();
+    const bool for_result  = (result_hwnd != nullptr) &&
+                             (msg.hwnd == result_hwnd ||
+                              IsChild(result_hwnd, msg.hwnd));
+    if (for_result) {
+      // Escape closes the viewer; all other keys dispatch normally.
+      if (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE) {
+        CloseResultWindow();
+        continue;
+      }
+    } else {
+      // Accelerator first so menu shortcuts (Ctrl+Q, '?', etc.) win
+      // over any TAB/arrow handling. Then IsDialogMessageW gives us
+      // dialog-style navigation in the top pane (TAB / Shift+TAB
+      // between WS_TABSTOP controls, arrows inside combos, Enter for
+      // the default button) which a plain WM_KEYDOWN dispatch on a
+      // non-dialog window wouldn't.
+      if (TranslateAcceleratorW(mainHwnd, hAccel, &msg)) {
+        continue;
+      }
+      if (IsDialogMessageW(mainHwnd, &msg)) {
+        continue;
+      }
     }
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
@@ -492,6 +510,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         LOG(ERROR) << L"Failed to register splitter class!";
         return -1;
       }
+      if (!RegisterResultWindowClass(g_hInstance)) {
+        LOG(ERROR) << L"Failed to register result window class!";
+        return -1;
+      }
       if (!CreateChildControls(hWnd)) {
         LOG(ERROR) << L"Failed to create child controls!";
         return -1;
@@ -522,7 +544,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     }
     case WM_GETMINMAXINFO: {
       LPMINMAXINFO pMinMaxInfo = reinterpret_cast<LPMINMAXINFO>(lParam);
-      ;
       pMinMaxInfo->ptMinTrackSize.x = CW_MINWIDTH;
       pMinMaxInfo->ptMinTrackSize.y = CW_MINHEIGHT;
       const int MAXWIDTH            = GetSystemMetrics(SM_CXMAXIMIZED);
@@ -685,9 +706,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CEXIT, 0), 0);
           break;
         case IDC_OPENOUT_BUTTON:
-          if (!ShellOpenResultFile(hWnd)) {
-            ErrorBox(hWnd, L"Open File Error", L"Failed to open result file.");
-          }
+          ToggleResultWindow(hWnd);
           break;
         case IDC_CLEARRESULT_BUTTON:
           SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CLEARRESULTS, 0), 0);
@@ -706,8 +725,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           LaunchHelp(hWnd);
           break;
         case IDM_CLEARRESULTS:
-          if (!ClearResultFile()) {
-            ErrorBox(hWnd, L"Results File Error", L"Failed to clear results file.");
+          if (ConfirmClearResults(hWnd)) {
+            if (!ClearResultFile()) {
+              ErrorBox(hWnd, L"Results File Error", L"Failed to clear results file.");
+            }
+            ReloadResultWindow();
           }
           break;
         case IDM_CLEAROUTPUT:
@@ -741,7 +763,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case IDM_COLOREDOUTPUT: {
           g_colored_output = ToggleMenuCheck(hWnd, IDM_COLOREDOUTPUT);
-          // Force the output edit to repaint immediately with the new colours.
+          // Force the output edit to repaint immediately.
           if (hOutputEdit != nullptr) {
             InvalidateRect(hOutputEdit, nullptr, TRUE);
           }
@@ -807,6 +829,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       CloseResultFile();
       logging::DeInitLogging(g_hInstance);
       break;
+    case WM_PICALC_RELOAD_RESULTS:
+      // Posted by the calc worker thread on completion, and by
+      // ToggleResultWindow on open. Kicks off the async file load.
+      ReloadResultWindow();
+      return 0;
     default:
       return DefWindowProcW(hWnd, message, wParam, lParam);
   }
@@ -828,6 +855,9 @@ void ShutDownApp() {
   // path (e.g. WM_CLOSE arriving after WM_DESTROY's tear-down began)
   // doesn't pass NULL to DestroyWindow, which is undefined per MSDN.
   if (mainHwnd != nullptr) {
+    // Result window has no owner, so it won't be auto-destroyed with the
+    // main window. Close it first so it doesn't linger after app exit.
+    CloseResultWindow();
     DestroyWindow(mainHwnd);
   }
 }
