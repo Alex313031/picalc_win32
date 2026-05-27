@@ -76,6 +76,26 @@ namespace {
   // calculations and closed on the next StartCalculation.
   HANDLE g_calc_thread = nullptr;
 
+  // sqrt(10005) needed for the final closed-form pi formula. Runs on
+  // its own worker so it can overlap with the BS instead of adding to
+  // the post-BS critical path.
+  struct SqrtArgs {
+    mpf_class sqrt_result; // Constructed at the calling thread's default precision.
+  };
+
+  DWORD WINAPI SqrtWorker(LPVOID thread_param) {
+    SqrtArgs* args = static_cast<SqrtArgs*>(thread_param);
+    mpf_sqrt_ui(args->sqrt_result.get_mpf_t(), 10005);
+    return 0;
+  }
+
+  // Background sqrt(10005) worker and its heap-allocated argument block.
+  // Heap allocation lets CalcThreadProc bail on stop without waiting for
+  // the sqrt to finish — StartCalculation joins and frees it before the
+  // next precision change so two sqrt workers never overlap.
+  HANDLE    g_sqrt_thread = nullptr;
+  SqrtArgs* g_sqrt_args   = nullptr;
+
   // Per-node binary-splitting tuple. T already folds in the leaf's
   // (A + B*k) factor, so the final formula needs Q and T only.
   struct PQT {
@@ -152,19 +172,6 @@ namespace {
   DWORD WINAPI BSWorker(LPVOID thread_param) {
     BSArgs* args = static_cast<BSArgs*>(thread_param);
     BinarySplitParallel(args->lo, args->hi, args->depth, &args->result);
-    return 0;
-  }
-
-  // sqrt(10005) needed for the final closed-form pi formula. Runs on
-  // its own worker so it can overlap with the BS instead of adding to
-  // the post-BS critical path.
-  struct SqrtArgs {
-    mpf_class sqrt_result; // Constructed at the calling thread's default precision.
-  };
-
-  DWORD WINAPI SqrtWorker(LPVOID thread_param) {
-    SqrtArgs* args = static_cast<SqrtArgs*>(thread_param);
-    mpf_sqrt_ui(args->sqrt_result.get_mpf_t(), 10005);
     return 0;
   }
 
@@ -380,11 +387,11 @@ namespace {
 
     // Kick off sqrt(10005) on its own worker. It needs the default mpf
     // precision we just set; by the time BS finishes the sqrt is
-    // typically done too, so its 5-10s falls out of the post-BS
-    // critical path. sqrt_args lives on the stack for the rest of the
-    // function so the worker's writes stay valid until we read them.
-    SqrtArgs sqrt_args;
-    HANDLE sqrt_handle = CreateThread(nullptr, 0, SqrtWorker, &sqrt_args, 0, nullptr);
+    // typically done too, so its 5-10s falls out of the post-BS critical
+    // path. Heap-allocated so CalcThreadProc can bail on stop without
+    // waiting; StartCalculation joins the stale thread before the next run.
+    g_sqrt_args   = new SqrtArgs;
+    g_sqrt_thread = CreateThread(nullptr, 0, SqrtWorker, g_sqrt_args, 0, nullptr);
 
     int num_terms = static_cast<int>(digits / kDigitsPerTerm) + 1;
     if (num_terms < 1) {
@@ -409,11 +416,24 @@ namespace {
     BinarySplitParallel(0, num_terms, depth, &total);
     const DWORD t_bs_end = GetTickCount();
 
-    // Rejoin the parallel sqrt. Log the wait (or inline cost) as its own
-    // stage so every gap between t_start and t_end is accounted for.
-    if (sqrt_handle != nullptr) {
-      WaitForSingleObject(sqrt_handle, INFINITE);
-      CloseHandle(sqrt_handle);
+    // Bail before touching the sqrt if BS was stopped. The sqrt thread
+    // continues in the background; StartCalculation will join it before
+    // changing precision for the next run.
+    if (StopRequested()) {
+      TruncateResultFileTo(run_start_pos);
+      std::wostringstream stop_line;
+      stop_line << kStoppedMessage << FormatThousands(digits) << L" digits.";
+      EmitLine(stop_line.str(), false);
+      g_running.store(false);
+      return 0;
+    }
+
+    // Rejoin the parallel sqrt now that we know we're going to use it.
+    // Log the wait (or inline cost) as its own stage.
+    if (g_sqrt_thread != nullptr) {
+      WaitForSingleObject(g_sqrt_thread, INFINITE);
+      CloseHandle(g_sqrt_thread);
+      g_sqrt_thread = nullptr;
       const DWORD sqrt_wait_ms = GetTickCount() - t_bs_end;
       if (sqrt_wait_ms > 0) {
         std::wostringstream line;
@@ -423,19 +443,10 @@ namespace {
     } else {
       // CreateThread failed — run sqrt inline and log it as a stage.
       const DWORD sq_start = GetTickCount();
-      mpf_sqrt_ui(sqrt_args.sqrt_result.get_mpf_t(), 10005);
+      mpf_sqrt_ui(g_sqrt_args->sqrt_result.get_mpf_t(), 10005);
       std::wostringstream line;
       line << L"sqrt(10005): " << ((GetTickCount() - sq_start) / 1000.0) << L"s.";
       EmitLine(line.str(), false);
-    }
-
-    if (StopRequested()) {
-      TruncateResultFileTo(run_start_pos);
-      std::wostringstream stop_line;
-      stop_line << kStoppedMessage << FormatThousands(digits) << L" digits.";
-      EmitLine(stop_line.str(), false);
-      g_running.store(false);
-      return 0;
     }
 
     // pi = kPiCoeff * sqrt(10005) * Q / T  (constants derived from
@@ -446,7 +457,7 @@ namespace {
     const DWORD mpf_start = GetTickCount();
     const mpf_class q_f(total.Q);
     const mpf_class t_f(total.T);
-    const mpf_class pi = (sqrt_args.sqrt_result * q_f * kPiCoeff) / t_f;
+    const mpf_class pi = (g_sqrt_args->sqrt_result * q_f * kPiCoeff) / t_f;
     {
       const DWORD elapsed = GetTickCount() - mpf_start;
       std::wostringstream line;
@@ -511,6 +522,8 @@ namespace {
       }
     }
 
+    delete g_sqrt_args;
+    g_sqrt_args = nullptr;
     g_running.store(false);
     return 0;
   }
@@ -545,6 +558,15 @@ bool StartCalculation(int digits, int threads) {
   if (g_calc_thread != nullptr) {
     CloseHandle(g_calc_thread);
     g_calc_thread = nullptr;
+  }
+  // If the previous run was stopped, its sqrt worker may still be running.
+  // Join it now before changing the global GMP precision.
+  if (g_sqrt_thread != nullptr) {
+    WaitForSingleObject(g_sqrt_thread, INFINITE);
+    CloseHandle(g_sqrt_thread);
+    g_sqrt_thread = nullptr;
+    delete g_sqrt_args;
+    g_sqrt_args = nullptr;
   }
   g_stop_requested.store(false);
   g_running.store(true);

@@ -739,22 +739,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           ToggleResultWindow(hWnd);
           break;
         case IDC_CLEARRESULT_BUTTON:
-          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CLEARRESULTS, 0), 0);
+          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDC_CLEARRESULTS, 0), 0);
           break;
         case IDC_CLEAROUTPUT_BUTTON:
-          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CLEAROUTPUT, 0), 0);
+          SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDC_CLEAROUTPUT, 0), 0);
           break;
         case IDC_STOP_BUTTON:
           if (!g_running.load()) {
             EmitLine(L"No Pi threads running", false);
           }
           StopCalculation();
-          PlayWav(IDR_OHNO_WAV);
+          if (g_sound_on) {
+            PlayWav(IDR_OHNO_WAV);
+          }
           break;
         case IDM_HELP:
           LaunchHelp(hWnd);
           break;
-        case IDM_CLEARRESULTS:
+        case IDC_CLEARRESULTS:
           if (ConfirmClearResults(hWnd)) {
             if (!ClearResultFile()) {
               ErrorBox(hWnd, L"Results File Error", L"Failed to clear results file.");
@@ -764,7 +766,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             }
           }
           break;
-        case IDM_CLEAROUTPUT:
+        case IDC_CLEAROUTPUT:
           ClearOutput();
           break;
         case IDM_CLEARLOG:

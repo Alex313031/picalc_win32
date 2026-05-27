@@ -23,18 +23,16 @@
 #define IDM_CEXIT                   202 // Exit confirmation
 #define IDM_HELP                    203 // Opens help
 #define IDM_SAVEAS                  204 // Saves client area screenshot
-#define IDM_CLEAROUTPUT             205 // Clears output pane
-#define IDM_RUN                     206 // "Run" dialog
-#define IDM_SLOW                    207 // Slow sysmon update speed
-#define IDM_MED                     208 // Med speed
-#define IDM_FAST                    209 // Fast speed
+#define IDM_RUN                     205 // "Run" dialog
+#define IDM_SLOW                    206 // Slow sysmon update speed
+#define IDM_MED                     207 // Med speed
+#define IDM_FAST                    208 // Fast speed
 
 #define IDM_SOUND                   250 // Whether to enale sounds app-wide
 #define IDM_CONSOLE                 251 // Toggle console window
-#define IDM_CLEARRESULTS            252 // Clear results .txt file
-#define IDM_COLOREDOUTPUT           253 // Whether output pane is b/w or color
-#define IDM_CLEARLOG                254 // Clears the log file
-#define IDM_OPENLOG                 255 // Opens log file with notepad
+#define IDM_COLOREDOUTPUT           252 // Whether output pane is b/w or color
+#define IDM_CLEARLOG                253 // Clears the log file
+#define IDM_OPENLOG                 254 // Opens log file with notepad
 
 // Embedded background sound WAV files
 #define IDR_TADA_WAV                500 // "Tada" sound when calculation complete
@@ -67,6 +65,8 @@
 #define IDC_PFTOTAL                 621 // Amount of page file used / Size of the page file
 #define IDC_VMTOTAL                 622 // Commit charge / Virtual Memory size: RAM + Pagefile space
 #define IDC_CACHETOTAL              623 // System cache usage / Set system cache size
+#define IDC_CLEAROUTPUT             624 // Clears output pane
+#define IDC_CLEARRESULTS            625 // Clears results .txt file
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC
