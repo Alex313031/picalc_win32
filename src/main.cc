@@ -1025,9 +1025,11 @@ bool InitApp(HWND hWnd) {
   }
   SendOutputMessage(GetWelcomeMessage());
   if (is_on_wine) {
-    EmitLine(ToWide("Running on Wine " + winever), false);
+    EmitLine(L"Running on Wine " + ToWide(winever) +
+             L" (NT Version " + GetNTVerString() + L")", false);
+  } else {
+    EmitLine(L"Windows NT Version " + GetNTVerString(), false);
   }
-  EmitLine(L"Windows NT Version: " + GetNTVerString(), false);
   // Pull defaults from the menu's CHECKED state first,
   // so they need the final values by the time they run.
   ApplyMenuDefaults(hWnd);
