@@ -491,8 +491,8 @@ bool CenterWindowOnScreen(HWND hWnd, bool multimon) {
   }
   const int screen_w = screen_rect.right - screen_rect.left;
   const int screen_h = screen_rect.bottom - screen_rect.top;
-  const int new_x    = screen_rect.left + (screen_w - window_w) / 2;
-  const int new_y    = screen_rect.top + (screen_h - window_h) / 2;
+  const int new_x    = (screen_rect.left + (screen_w - (window_w * 2))) / 2;
+  const int new_y    = (screen_rect.top + (screen_h - window_h)) / 2;
   // SWP_NOSIZE / NOZORDER / NOACTIVATE: pure reposition, don't disturb
   // size, stacking order, or focus.
   return SetWindowPos(hWnd, nullptr, new_x, new_y, 0, 0,

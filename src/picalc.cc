@@ -193,12 +193,17 @@ namespace {
   // creation overhead (~100us on Win32) would outweigh the savings, so
   // we keep the original serial path for those.
   void Combine(const PQT& left_pqt, const PQT& right_pqt, PQT* out) {
+    if (StopRequested()) {
+      return;
+    }
     constexpr size_t kParallelMulThresholdLimbs = 8000; // ~64KB at 8B/limb
     const bool parallelize = mpz_size(left_pqt.P.get_mpz_t()) > kParallelMulThresholdLimbs ||
                              mpz_size(left_pqt.T.get_mpz_t()) > kParallelMulThresholdLimbs;
     if (!parallelize) {
       out->P = left_pqt.P * right_pqt.P;
+      if (StopRequested()) return;
       out->Q = left_pqt.Q * right_pqt.Q;
+      if (StopRequested()) return;
       out->T = right_pqt.Q * left_pqt.T + left_pqt.P * right_pqt.T;
       return;
     }
@@ -213,6 +218,7 @@ namespace {
     }
     // Fourth mul on the current thread so we don't waste it blocking.
     mpz_class t_right = left_pqt.P * right_pqt.T;
+    // Always join the workers — they hold pointers into muls[] on our stack.
     for (int mul_idx = 0; mul_idx < 3; ++mul_idx) {
       if (handles[mul_idx] == nullptr) {
         // CreateThread failed - do this one inline too.
@@ -221,6 +227,9 @@ namespace {
         WaitForSingleObject(handles[mul_idx], INFINITE);
         CloseHandle(handles[mul_idx]);
       }
+    }
+    if (StopRequested()) {
+      return;
     }
     out->P = std::move(muls[0].result);
     out->Q = std::move(muls[1].result);
@@ -233,8 +242,10 @@ namespace {
   // subtrees - no race for a shared concurrency counter, no degenerate
   // case where one worker ends up running half the calculation alone.
   //
-  // The stop check at the top of every call means cancellation reaches
-  // us at the next call boundary (i.e. after the current mpz multiply).
+  // Stop is checked at entry and again before every Combine call. A
+  // running mpz_mul cannot be interrupted (GMP is not cancellable), but
+  // once the current level's muls drain the next (larger) level's combine
+  // is skipped immediately, so CPU drops after at most one merge level.
   void BinarySplitParallel(int lo, int hi, int depth, PQT* out) {
     if (StopRequested()) {
       return;
@@ -274,6 +285,9 @@ namespace {
       // Budget exhausted (or CreateThread failed): both subtrees inline.
       BinarySplitParallel(lo, mid, 0, &left_args.result);
       BinarySplitParallel(mid, hi, 0, &right_pqt);
+    }
+    if (StopRequested()) {
+      return;
     }
     // Standard BS combine, but with the four products parallelised on
     // large operands. See Combine() for the size threshold and rationale.

@@ -178,9 +178,8 @@ void ReloadResultWindow() {
   SetWindowTextW(s_result_edit, display.empty() ? L"(No results yet)" : display.c_str());
   SendMessageW(s_result_edit, WM_SETREDRAW, TRUE, 0);
   InvalidateRect(s_result_edit, nullptr, TRUE);
-  // Scroll to the end so the most recent result is visible.
-  const int len = GetWindowTextLengthW(s_result_edit);
-  SendMessageW(s_result_edit, EM_SETSEL, static_cast<WPARAM>(len), static_cast<LPARAM>(len));
+  // Place cursor at the beginning so the file opens at the top.
+  SendMessageW(s_result_edit, EM_SETSEL, 0, 0);
   SendMessageW(s_result_edit, EM_SCROLLCARET, 0, 0);
 }
 
@@ -287,6 +286,7 @@ static LRESULT CALLBACK ResultWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPA
       // fast even for large files. Post-calc reloads hit ReloadResultWindow
       // directly and rely on WM_SETREDRAW to reduce layout overhead.
       ReloadResultWindow();
+      SetFocus(s_result_edit);
       LOG(INFO) << L"Opened results window";
       return 0;
     }

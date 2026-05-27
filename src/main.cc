@@ -403,6 +403,19 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
       if (TranslateAcceleratorW(mainHwnd, hAccel, &msg)) {
         continue;
       }
+      // Enter on a closed combobox starts the calculation. IsDialogMessageW
+      // can swallow VK_RETURN on CBS_DROPDOWNLIST combos without routing it
+      // to the default button, so intercept it here first.
+      if (msg.message == WM_KEYDOWN && msg.wParam == VK_RETURN) {
+        const HWND focused = GetFocus();
+        if ((focused == hDigitsCombo || focused == hThreadsCombo) &&
+            !SendMessageW(focused, CB_GETDROPPEDSTATE, 0, 0)) {
+          SendMessageW(mainHwnd, WM_COMMAND,
+                       MAKEWPARAM(IDC_START_BUTTON, BN_CLICKED),
+                       reinterpret_cast<LPARAM>(hStartButton));
+          continue;
+        }
+      }
       if (IsDialogMessageW(mainHwnd, &msg)) {
         continue;
       }
@@ -528,6 +541,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       s_threads_custom_injected  = IsInitialThreadsCustomInjected();
       InitApp(hWnd);
       SendOutputMessage(GetWelcomeMessage());
+      SetFocus(hStartButton);
       break;
     case WM_TIMER: {
       break;
