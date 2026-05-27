@@ -16,10 +16,6 @@ inline constexpr COLORREF kKernelFillColor = RGB_DARKRED;
 // Pixels the graph scrolls left per sysmon timer tick.
 inline constexpr unsigned int kGraphScrollStep = 5u;
 
-inline constexpr ULONGLONG kGB = 1024ULL * 1024ULL * 1024ULL;
-inline constexpr ULONGLONG kMB = 1024ULL * 1024ULL;
-inline constexpr ULONGLONG kKB = 1024ULL;
-
 // Creates the sysmon groupbox and its child controls as children of `parent`.
 // Must be called once from CreateChildControls.
 bool CreateSysmonControls(HWND parent);

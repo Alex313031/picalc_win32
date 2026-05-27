@@ -1,7 +1,7 @@
 #ifndef PICALCWIN32_STRINGS_H_
 #define PICALCWIN32_STRINGS_H_
 
-#include "version.h"
+#include "framework.h"
 
 // Strings to print
 inline const wchar_t* const kCalculateMessage = L"Started calculating ";
@@ -50,5 +50,20 @@ inline const wchar_t* const kDigitOptions[] = {
 inline const wchar_t* const kThreadsOptions[] = {
     // Threads options offered in the num cpu threads combobox.
     L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"Custom"};
+
+// Wide <-> ANSI conversion helpers (CP_ACP; returns empty string on null/error).
+std::string  ToANSI(const wchar_t*      in);
+std::string  ToANSI(const std::wstring& in);
+std::string  ToANSI(const std::wstring* in);
+std::wstring ToWide(const char*         in);
+std::wstring ToWide(const std::string&  in);
+std::wstring ToWide(const std::string*  in);
+
+// Formats a byte count into the most readable unit: "1.23 GB", "456.00 MB", etc.
+void FormatBytes(wchar_t* buf, size_t cnt, ULONGLONG bytes);
+
+// Formats a used/limit pair with a shared unit suffix: "1.23 / 16.00 GB".
+// Unit is chosen by limit (the larger value).
+void FormatBytesPair(wchar_t* buf, size_t cnt, ULONGLONG used, ULONGLONG limit);
 
 #endif // PICALCWIN32_STRINGS_H_

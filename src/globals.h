@@ -37,4 +37,6 @@ extern bool can_use_582_controls; // Whether we can use "modern" common controls
 
 extern COLORREF g_bkg_color; // Window background color
 
+extern bool is_on_wine;
+
 #endif // PICALCWIN32_GLOBALS_H_

@@ -340,8 +340,7 @@ namespace {
     if (truncated) {
       formatted += "... (Open result file to see full value)";
     }
-    // ASCII narrow -> wide. mpf_get_str only emits 0-9 / '-' / '.'.
-    return std::wstring(formatted.begin(), formatted.end());
+    return ToWide(formatted);
   }
 
   // =========================================================================

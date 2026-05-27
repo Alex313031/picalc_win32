@@ -5,6 +5,8 @@
 
 #include "main.h"
 
+#include <timeapi.h>
+
 #include "controls.h"
 #include "globals.h"
 #include "resource.h"
@@ -97,7 +99,10 @@ HICON kSmallIcon = nullptr;
 // Whether we have commctl32 5.82 (XP/I.E 6.0)
 bool can_use_582_controls = false;
 
-COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE);
+COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE); // Standard grey background
+
+bool is_on_wine = false; // Whether we are on wine
+static std::string winever = "";
 
 // =========================================================================
 // Forward declarations
@@ -317,6 +322,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   if (argv != nullptr) {
     LocalFree(argv);
   }
+  timeBeginPeriod(kTimerResolution); // raise system timer resolution to 1ms for accurate sysmon ticks
   // Open a conhost window when we have anything text-y to show. Without
   // any of these flags, the log sink defaults to LOG_NONE - LOG() calls
   // become near-no-ops, useful in release.
@@ -337,6 +343,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 3;
   }
   logging::SetIsDCheck(is_dcheck);
+  is_on_wine = IsRunningOnWine(&winever);
   if (g_show_version) {
     return ShowVersionAndExit();
   }
@@ -431,6 +438,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   if (hAccel != nullptr) {
     DestroyAcceleratorTable(hAccel);
   }
+  timeEndPeriod(kTimerResolution); // restore default timer resolution on exit
   return static_cast<int>(msg.wParam);
 }
 
@@ -561,7 +569,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       s_prev_threads_sel         = GetInitialThreadsSel();
       s_threads_custom_injected  = IsInitialThreadsCustomInjected();
       InitApp(hWnd);
-      SendOutputMessage(GetWelcomeMessage());
       SetFocus(hStartButton);
       break;
     case WM_TIMER: {
@@ -937,6 +944,11 @@ bool InitApp(HWND hWnd) {
   if (hWnd == nullptr) {
     return false;
   }
+  SendOutputMessage(GetWelcomeMessage());
+  if (is_on_wine) {
+    EmitLine(ToWide("Running on Wine " + winever), false);
+  }
+  EmitLine(L"Windows NT Version: " + GetNTVerString(), false);
   // Pull defaults from the menu's CHECKED state first,
   // so they need the final values by the time they run.
   ApplyMenuDefaults(hWnd);

@@ -126,9 +126,16 @@ inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 inline constexpr DWORD dwComCtl32TargetVer =
     _PACKVERSION(static_cast<DWORD>(5u), static_cast<DWORD>(82u));
 
+static inline constexpr UINT kTimerResolution = 1u; // Minimum timer resolution
+
 // Delay in milliseconds for system monitor timer.
 inline constexpr unsigned long kSlowSpeed = 2000UL;
 inline constexpr unsigned long kMedSpeed  = 1000UL;
 inline constexpr unsigned long kHighSpeed = 500UL;
+
+// Byte-size multipliers.
+inline constexpr ULONGLONG kGB = 1024ULL * 1024ULL * 1024ULL;
+inline constexpr ULONGLONG kMB = 1024ULL * 1024ULL;
+inline constexpr ULONGLONG kKB = 1024ULL;
 
 #endif // PICALCWIN32_CONSTANTS_H_

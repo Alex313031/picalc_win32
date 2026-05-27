@@ -65,9 +65,14 @@ const std::wstring GetVersionString();
 // Returns APP_NAME as wstring, for easier usage.
 const std::wstring GetAppName();
 
+bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build);
+
 // Returns true on Windows XP (5.1) or later, false on Windows 2000 (5.0)
 // or earlier. Used to gate styles / APIs that exist only on WinXP.
 bool IsWindowsXpOrLater();
+
+// Gets the real Windows NT version as a human readable wstring.
+const std::wstring GetNTVerString();
 
 // For checking system's commctl32.dll
 bool IsCommCtrlAtLeast(const DWORD to_compare);
@@ -147,5 +152,8 @@ bool WriteLineToResultFile(const std::wstring& line);
 
 // Opens the system run dialog
 void OpenRunDialog(HWND hWnd);
+
+// Gets if program is running on Wine, with optional string to get version.
+bool IsRunningOnWine(std::string* outWineVer = nullptr);
 
 #endif // PICALCWIN32_UTILS_H_

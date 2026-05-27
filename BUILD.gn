@@ -26,6 +26,7 @@ executable("picalc_win32") {
     "src/resource.h",
     "src/results.cc",
     "src/results.h",
+    "src/strings.cc",
     "src/strings.h",
     "src/sysmon.cc",
     "src/sysmon.h",

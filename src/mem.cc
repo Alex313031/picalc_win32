@@ -1,6 +1,7 @@
 // Functions to get the amount of RAM, pagefile usage, VM usage, etc.
 
 #include "mem.h"
+#include "utils.h"
 
 // GlobalMemoryStatusEx is XP+; GlobalMemoryStatus is Win2K fallback.
 // Both are in kernel32.dll — GlobalMemoryStatusEx is resolved dynamically
@@ -38,6 +39,10 @@ struct SysFileCacheInfo {
   SIZE_T MinimumWorkingSet;
   SIZE_T MaximumWorkingSet;
 };
+
+// Byte offset of ResidentSystemCachePage in SYSTEM_PERFORMANCE_INFORMATION.
+// 4 LARGE_INTEGERs (32 bytes) + 33 ULONGs (132 bytes) = 164 = 0xA4.
+static constexpr ULONG kResidentCachePageOffset = 164;
 
 static FnGlobalMemoryStatusEx ResolveGlobalMemStatEx() {
   static FnGlobalMemoryStatusEx pfn = nullptr;
@@ -139,16 +144,36 @@ bool UpdateMemStats(MemStats* out) {
       any_ok = true;
     }
 
-    // System file cache.
-    SysFileCacheInfo ci = {};
-    ULONG returned = 0;
-    LONG status = pfnNtQuery(kSysFileCacheInfo, &ci,
-                             static_cast<ULONG>(sizeof(ci)), &returned);
-    if (status == 0 && returned >= static_cast<ULONG>(2 * sizeof(SIZE_T))) {
-      out->cache_bytes = ci.CurrentSize;
-      out->cache_peak  = ci.PeakSize;
-      out->cache_limit = static_cast<ULONGLONG>(ci.MaximumWorkingSet);
-      any_ok = true;
+    // Cache queries don't work on Wine — skip them so the display shows NaN.
+    static const bool s_is_wine = IsRunningOnWine();
+    if (!s_is_wine) {
+      // Physically resident cache pages — matches Task Manager "System Cache".
+      // SYSTEM_PERFORMANCE_INFORMATION is ~296-320 bytes depending on OS version;
+      // NtQuerySI(2) returns STATUS_INFO_LENGTH_MISMATCH if the buffer is too small,
+      // so use 512 bytes to cover all versions. Then read ResidentSystemCachePage
+      // at offset 0xA4 from the returned data.
+      BYTE perf_buf[512] = {};
+      ULONG perf_returned = 0;
+      LONG perf_status = pfnNtQuery(kSysPerfInfo, perf_buf,
+                                    static_cast<ULONG>(sizeof(perf_buf)), &perf_returned);
+      if (perf_status == 0 &&
+          perf_returned >= kResidentCachePageOffset + static_cast<ULONG>(sizeof(ULONG))) {
+        ULONG resident_pages;
+        memcpy(&resident_pages, perf_buf + kResidentCachePageOffset, sizeof(resident_pages));
+        out->cache_bytes = static_cast<SIZE_T>(resident_pages) * GetPageSize();
+        any_ok = true;
+      }
+
+      // Cache peak and limit from class 21 (CurrentSize not used — see class 2 above).
+      SysFileCacheInfo ci = {};
+      ULONG returned = 0;
+      LONG status = pfnNtQuery(kSysFileCacheInfo, &ci,
+                               static_cast<ULONG>(sizeof(ci)), &returned);
+      if (status == 0 && returned >= static_cast<ULONG>(2 * sizeof(SIZE_T))) {
+        out->cache_peak  = ci.PeakSize;
+        out->cache_limit = static_cast<ULONGLONG>(ci.MaximumWorkingSet);
+        any_ok = true;
+      }
     }
   }
 

@@ -18,11 +18,6 @@
 
 static RUN_FILE_DLG_ pfnRunFileDlg = nullptr;
 
-// =========================================================================
-// Static forward declarations
-// =========================================================================
-
-static bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build);
 static DWORD GetCommCtrlVersion();
 
 // =========================================================================
@@ -309,42 +304,47 @@ const std::wstring GetAppName() {
   return app_name;
 }
 
-static bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build) {
+bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build) {
   HMODULE hNtDll = GetModuleHandleW(L"ntdll.dll");
   if (hNtDll == nullptr) {
     return false;
   }
+
+  // Primary: RtlGetNtVersionNumbers (XP+, undocumented). Packs a build-type
+  // flag into the top 4 bits of buildVer — mask them off so callers see the
+  // plain build number (e.g. 2600 for XP SP3, 19045 for Win10 22H2).
   const RtlGetNtVersionNumbers_t pfnRtlGetNtVersionNumbers =
-      reinterpret_cast<RtlGetNtVersionNumbers_t>(GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
-  if (pfnRtlGetNtVersionNumbers == nullptr) {
-    return false;
+      reinterpret_cast<RtlGetNtVersionNumbers_t>(
+          GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
+  if (pfnRtlGetNtVersionNumbers != nullptr) {
+    DWORD majorVer = 0, minorVer = 0, buildVer = 0;
+    pfnRtlGetNtVersionNumbers(&majorVer, &minorVer, &buildVer);
+    if (majorVer != 0) {
+      if (major != nullptr) *major = static_cast<UINT>(majorVer);
+      if (minor != nullptr) *minor = static_cast<UINT>(minorVer);
+      if (build != nullptr) *build = static_cast<UINT>(buildVer & 0x0FFFFFFFu);
+      return true;
+    }
   }
-  DWORD majorVer = 0;
-  DWORD minorVer = 0;
-  DWORD buildVer = 0;
-  pfnRtlGetNtVersionNumbers(&majorVer, &minorVer, &buildVer);
-  if (majorVer == 0) {
-    return false; // Should never be zero
+
+  // Fallback: RtlGetVersion (Win2K+, documented NT-native, not shimmed by
+  // application-compatibility manifests unlike GetVersionExW on Win8.1+).
+  typedef LONG (WINAPI* RtlGetVersion_t)(OSVERSIONINFOW*);
+  const RtlGetVersion_t pfnRtlGetVersion =
+      reinterpret_cast<RtlGetVersion_t>(
+          GetProcAddress(hNtDll, "RtlGetVersion"));
+  if (pfnRtlGetVersion != nullptr) {
+    OSVERSIONINFOW vi = {};
+    vi.dwOSVersionInfoSize = sizeof(vi);
+    if (pfnRtlGetVersion(&vi) == 0 && vi.dwMajorVersion != 0) {
+      if (major != nullptr) *major = static_cast<UINT>(vi.dwMajorVersion);
+      if (minor != nullptr) *minor = static_cast<UINT>(vi.dwMinorVersion);
+      if (build != nullptr) *build = static_cast<UINT>(vi.dwBuildNumber);
+      return true;
+    }
   }
-  // RtlGetNtVersionNumbers packs the build-type flag into the top 4 bits
-  // of the build number: 0xC0000000 = checked (debug) build, 0xF0000000 =
-  // free (release) build. Bit Mask them off so callers see the same plain
-  // build number the OS reports everywhere else (e.g. 2600 on XP SP3,
-  // 7601 on Win7 SP1, 19045 on a recent Win10) instead of the raw
-  // 0xF0000A28 = 4026534440 mess.
-  const DWORD cleanBuildVer = buildVer & 0x0FFFFFFFu;
-  // Out-params are individually optional - skip the assignment if a caller
-  // passed nullptr (e.g. they only care about the major version).
-  if (major != nullptr) {
-    *major = static_cast<unsigned int>(majorVer);
-  }
-  if (minor != nullptr) {
-    *minor = static_cast<unsigned int>(minorVer);
-  }
-  if (build != nullptr) {
-    *build = static_cast<unsigned int>(cleanBuildVer);
-  }
-  return true;
+
+  return false;
 }
 
 bool IsWindowsXpOrLater() {
@@ -356,6 +356,22 @@ bool IsWindowsXpOrLater() {
     return major > 5u || (major == 5u && minor >= 1u);
   }
   return false; // Safe fallback, assume Win 2K
+}
+
+const std::wstring GetNTVerString() {
+  UINT major = 0;
+  UINT minor = 0;
+  UINT build = 0;
+  std::wstring retval;
+  std::wostringstream wostr;
+  if (GetRawNtVersion(&major, &minor, &build)) {
+    wostr << major << L"." << minor << L"." << build;
+    retval = wostr.str();
+  } else {
+    LOG(ERROR) << L"Unable to get NT version!";
+    retval = L"Unknown";
+  }
+  return retval;
 }
 
 static DWORD GetCommCtrlVersion() {
@@ -667,4 +683,31 @@ void OpenRunDialog(HWND hWnd) {
     }
     LOG(DEBUG) << L"Opened Run dialog";
   }
+}
+
+bool IsRunningOnWine(std::string* outWineVer) {
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  if (ntdll == nullptr) {
+    return false;
+  }
+  // Cleaner one-liner via a typedef than splitting the function-pointer
+  // declaration and the assignment across two lines.
+  typedef const char*(CDECL * WineGetVersion_t)(void);
+  const WineGetVersion_t pwine_get_version =
+      reinterpret_cast<WineGetVersion_t>(GetProcAddress(ntdll, "wine_get_version"));
+  if (pwine_get_version == nullptr) {
+    return false;
+  }
+  // Wine's implementation always returns a valid string in practice, but
+  // std::string(nullptr) is undefined behavior - guard it.
+  const char* wineVer = pwine_get_version();
+  if (wineVer == nullptr) {
+    return false;
+  }
+  // outWineVer is optional: callers that only care about the bool can pass
+  // nullptr. Without this null-check we'd crash on the dereference below.
+  if (outWineVer != nullptr) {
+    *outWineVer = wineVer;
+  }
+  return true;
 }

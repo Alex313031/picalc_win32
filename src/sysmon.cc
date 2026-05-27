@@ -315,31 +315,6 @@ static CpuStats s_cpu_stats = {};
 static MemStats s_mem_stats = {};
 
 // =========================================================================
-// Value formatting helpers (local to this translation unit)
-// =========================================================================
-
-// Formats a byte count into the most readable unit: GB, MB, or KB.
-static void FormatBytes(wchar_t* buf, size_t cnt, ULONGLONG bytes) {
-  if (bytes >= kGB) {
-    swprintf(buf, cnt, L"%.2f GB", static_cast<double>(bytes) / static_cast<double>(kGB));
-  } else if (bytes >= kMB) {
-    swprintf(buf, cnt, L"%.2f MB", static_cast<double>(bytes) / static_cast<double>(kMB));
-  } else {
-    swprintf(buf, cnt, L"%I64u KB", bytes / 1024ULL);
-  }
-}
-
-// Formats a used/limit pair with a shared unit suffix: "1.23 / 16.00 GB".
-static void FormatBytesPair(wchar_t* buf, size_t cnt, ULONGLONG used, ULONGLONG limit) {
-  if (limit >= kGB) {
-    swprintf(buf, cnt, L"%.2f / %.2f GB",
-             static_cast<double>(used)  / static_cast<double>(kGB),
-             static_cast<double>(limit) / static_cast<double>(kGB));
-  } else {
-    swprintf(buf, cnt, L"%I64u / %I64u MB", used / kMB, limit / kMB);
-  }
-}
-
 // =========================================================================
 // Timer + tick
 // =========================================================================
@@ -404,7 +379,11 @@ void OnSysmonTick(HWND hWnd) {
     };
     FormatBytesPair(buf, 48, s_mem_stats.ram_used, s_mem_stats.ram_total);
     set_str(IDC_RAMTOTAL, buf);
-    FormatBytesPair(buf, 48, s_mem_stats.pf_used, s_mem_stats.pf_limit);
+    if (s_mem_stats.pf_limit > 0ULL) {
+      FormatBytesPair(buf, 48, s_mem_stats.pf_used, s_mem_stats.pf_limit);
+    } else {
+      swprintf(buf, 48, L"NaN");
+    }
     set_str(IDC_PFTOTAL, buf);
     FormatBytesPair(buf, 48, s_mem_stats.vm_used, s_mem_stats.vm_limit);
     set_str(IDC_VMTOTAL, buf);
@@ -412,7 +391,9 @@ void OnSysmonTick(HWND hWnd) {
     // (SIZE_T)-1 is the sentinel Windows uses for "system-managed / no fixed limit".
     static const ULONGLONG kCacheLimitUnlimited =
         static_cast<ULONGLONG>(static_cast<SIZE_T>(-1));
-    if (s_mem_stats.cache_limit != kCacheLimitUnlimited && s_mem_stats.cache_limit > 0) {
+    if (s_mem_stats.cache_bytes == 0ULL) {
+      swprintf(buf, 48, L"NaN");
+    } else if (s_mem_stats.cache_limit != kCacheLimitUnlimited && s_mem_stats.cache_limit > 0ULL) {
       FormatBytesPair(buf, 48,
                       static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
                       s_mem_stats.cache_limit);
