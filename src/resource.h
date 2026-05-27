@@ -8,6 +8,7 @@
 #define IDI_MAIN                    101 /* 32x32 & 48x48 icon */
 #define IDI_SMALL                   102 /* Small 16x16 icon */
 #define IDI_ABOUT                   103 /* About Dialog icon */
+#define IDI_WINFLAG                 104 /* Run Dialog icon */
 
 /* Main application resource, also used to attach menu */
 #define IDR_MAIN                    120

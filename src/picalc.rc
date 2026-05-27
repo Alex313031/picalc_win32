@@ -28,9 +28,10 @@ CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "res/picalc.manifest"
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 
-IDI_MAIN   ICON  "res/main.ico"
-IDI_SMALL  ICON  "res/small.ico"
-IDI_ABOUT  ICON  "res/about.ico"
+IDI_MAIN     ICON  "res/main.ico"
+IDI_SMALL    ICON  "res/small.ico"
+IDI_ABOUT    ICON  "res/about.ico"
+IDI_WINFLAG  ICON  "res/winflag.ico"
 
 // Embedded sounds
 IDR_TADA_WAV     WAVE  "res/tada.wav"
