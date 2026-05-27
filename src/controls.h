@@ -51,6 +51,13 @@ void EmitLine(const std::wstring& msg, bool is_error);
 // Wipes the output edit. No-op if the control hasn't been created yet.
 void ClearOutput();
 
+// Returns the combo index and custom-injected flag that CreateChildControls
+// chose for the threads combo (based on GetLogicalProcessorCount).
+// main.cc reads these after CreateChildControls to seed s_prev_threads_sel
+// and s_threads_custom_injected.
+int  GetInitialThreadsSel();
+bool IsInitialThreadsCustomInjected();
+
 // Reads the current selection from the digits / threads combos and
 // converts the displayed string ("1K", "1,000", "10M", "32") to an
 // integer. Returns -1 when "Custom" is selected, the combo has no

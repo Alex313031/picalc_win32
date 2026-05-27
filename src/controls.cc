@@ -3,6 +3,7 @@
 #include "controls.h"
 
 #include "constants.h"
+#include "cpu.h"
 #include "main.h"
 #include "resource.h"
 #include "strings.h"
@@ -17,6 +18,11 @@ static const wchar_t* kSplitterClassName = L"PicalcSplitter";
 // -1 = uninitialised, gets centred on the first LayoutChildren call.
 static int s_splitter_y = -1;
 static bool s_dragging  = false;
+
+// Set by CreateChildControls; read by main.cc to seed s_prev_threads_sel
+// and s_threads_custom_injected after controls are created.
+static int  s_initial_threads_sel              = 0;
+static bool s_initial_threads_custom_injected  = false;
 
 // Group box that frames the top-pane controls. Sized in LayoutChildren
 // since its bottom edge tracks the splitter position.
@@ -282,11 +288,49 @@ bool CreateChildControls(HWND parent) {
   for (const wchar_t* opt : kThreadsOptions) {
     SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
   }
-  // Default selections: 1M digits (index 5), 2 threads (index 1).
+  // Default digit selection: 1M digits (index 5).
   SendMessageW(hDigitsCombo, CB_SETCURSEL, 5, 0);
-  SendMessageW(hThreadsCombo, CB_SETCURSEL, 1, 0);
+
+  // Default thread selection: exact logical CPU count, clamped to kMaxNumThreads.
+  const DWORD cpu_count =
+      std::min(static_cast<DWORD>(kMaxNumThreads), GetLogicalProcessorCount());
+
+  // Check for an exact match in the non-Custom entries.
+  const int kNonCustomCount = static_cast<int>(ARRAYSIZE(kThreadsOptions)) - 1;
+  int threads_sel = -1;
+  for (int i = 0; i < kNonCustomCount; ++i) {
+    if (static_cast<DWORD>(wcstoul(kThreadsOptions[i], nullptr, 10)) == cpu_count) {
+      threads_sel = i;
+      break;
+    }
+  }
+
+  if (threads_sel >= 0) {
+    SendMessageW(hThreadsCombo, CB_SETCURSEL, threads_sel, 0);
+    s_initial_threads_sel             = threads_sel;
+    s_initial_threads_custom_injected = false;
+  } else {
+    // CPU count isn't a standard option — inject it before "Custom".
+    wchar_t cpu_str[16];
+    swprintf(cpu_str, ARRAYSIZE(cpu_str), L"%u", cpu_count);
+    const int insert_at =
+        static_cast<int>(SendMessageW(hThreadsCombo, CB_GETCOUNT, 0, 0)) - 1;
+    SendMessageW(hThreadsCombo, CB_INSERTSTRING, insert_at,
+                 reinterpret_cast<LPARAM>(cpu_str));
+    SendMessageW(hThreadsCombo, CB_SETCURSEL, insert_at, 0);
+    s_initial_threads_sel             = insert_at;
+    s_initial_threads_custom_injected = true;
+  }
 
   return true;
+}
+
+int GetInitialThreadsSel() {
+  return s_initial_threads_sel;
+}
+
+bool IsInitialThreadsCustomInjected() {
+  return s_initial_threads_custom_injected;
 }
 
 int GetSplitterY() {

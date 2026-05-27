@@ -16,10 +16,10 @@
 // =========================================================================
 
 // Previous non-"Custom" selection for each combo, used to revert when the
-// user cancels the custom-input dialog. Initialised to the startup defaults
-// (index 5 = "1M" for digits, index 1 = "2" for threads).
+// user cancels the custom-input dialog. Digits defaults to index 5 ("1M");
+// threads is seeded from GetInitialThreadsSel() after CreateChildControls.
 static int s_prev_digits_sel          = 5;
-static int s_prev_threads_sel         = 1;
+static int s_prev_threads_sel         = 0;
 static bool s_digits_custom_injected  = false;
 static bool s_threads_custom_injected = false;
 
@@ -524,6 +524,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         LOG(ERROR) << L"Failed to create child controls!";
         return -1;
       }
+      s_prev_threads_sel         = GetInitialThreadsSel();
+      s_threads_custom_injected  = IsInitialThreadsCustomInjected();
       InitApp(hWnd);
       SendOutputMessage(GetWelcomeMessage());
       break;
