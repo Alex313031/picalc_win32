@@ -10,6 +10,7 @@
 #include "resource.h"
 #include "results.h"
 #include "strings.h"
+#include "sysmon.h"
 
 // =========================================================================
 // Statics
@@ -42,6 +43,10 @@ static bool s_console_hidden = false;
 
 // Whether window was minimized or not
 static bool s_was_minimized = false;
+
+// Sysmon polling interval, latched from the .rc's CHECKED speed item in
+// ApplyMenuDefaults. Defaults to kMedSpeed if no item is checked.
+static UINT s_sysmon_speed = kMedSpeed;
 
 // =========================================================================
 // Globals
@@ -446,6 +451,22 @@ static void ApplyMenuDefaults(HWND hWnd) {
   g_sound_on = IsMenuChecked(menu, IDM_SOUND);
   // Initial colored-output state from the .rc's CHECKED flag on IDM_COLOREDOUTPUT.
   g_colored_output = IsMenuChecked(menu, IDM_COLOREDOUTPUT);
+  // Sysmon speed: whichever of the three speed items the .rc marks CHECKED.
+  // Fall through to kMedSpeed if none are explicitly checked.
+  UINT speed_id = IDM_MED;
+  if (IsMenuChecked(menu, IDM_SLOW)) {
+    s_sysmon_speed = kSlowSpeed;
+    speed_id       = IDM_SLOW;
+  } else if (IsMenuChecked(menu, IDM_FAST)) {
+    s_sysmon_speed = kHighSpeed;
+    speed_id       = IDM_FAST;
+  } else {
+    s_sysmon_speed = kMedSpeed;
+    speed_id       = IDM_MED;
+  }
+  // Replace the .rc's plain CHECKED mark with a radio check so the
+  // three speed items behave as a mutually exclusive group.
+  CheckMenuRadioItem(menu, IDM_SLOW, IDM_FAST, speed_id, MF_BYCOMMAND);
 }
 
 static INT_PTR CALLBACK CustomInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -544,6 +565,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       SetFocus(hStartButton);
       break;
     case WM_TIMER: {
+      if (wParam == WM_MONTIMER) {
+        OnSysmonTick(hWnd);
+      }
       break;
     }
     case WM_ERASEBKGND: {
@@ -855,6 +879,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           UpdateConsoleToggleMenu(hWnd);
           break;
         }
+        case IDM_SLOW:
+          s_sysmon_speed = kSlowSpeed;
+          CheckMenuRadioItem(GetMenu(hWnd), IDM_SLOW, IDM_FAST, IDM_SLOW, MF_BYCOMMAND);
+          StartSysmon(hWnd, s_sysmon_speed);
+          break;
+        case IDM_MED:
+          s_sysmon_speed = kMedSpeed;
+          CheckMenuRadioItem(GetMenu(hWnd), IDM_SLOW, IDM_FAST, IDM_MED, MF_BYCOMMAND);
+          StartSysmon(hWnd, s_sysmon_speed);
+          break;
+        case IDM_FAST:
+          s_sysmon_speed = kHighSpeed;
+          CheckMenuRadioItem(GetMenu(hWnd), IDM_SLOW, IDM_FAST, IDM_FAST, MF_BYCOMMAND);
+          StartSysmon(hWnd, s_sysmon_speed);
+          break;
         case IDM_RUN:
           OpenRunDialog(hWnd);
           break;
@@ -901,6 +940,7 @@ bool InitApp(HWND hWnd) {
   // Pull defaults from the menu's CHECKED state first,
   // so they need the final values by the time they run.
   ApplyMenuDefaults(hWnd);
+  StartSysmon(hWnd, s_sysmon_speed);
   return true;
 }
 
@@ -909,8 +949,7 @@ void ShutDownApp() {
   // path (e.g. WM_CLOSE arriving after WM_DESTROY's tear-down began)
   // doesn't pass NULL to DestroyWindow, which is undefined per MSDN.
   if (mainHwnd != nullptr) {
-    // Result window has no owner, so it won't be auto-destroyed with the
-    // main window. Close it first so it doesn't linger after app exit.
+    StopSysmon(mainHwnd);
     CloseResultWindow();
     DestroyWindow(mainHwnd);
   }

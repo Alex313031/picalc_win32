@@ -18,7 +18,8 @@ It uses the [GMP](https://gmplib.org/) library for large floating point math.
 ## Building
 
 ### With GN/Ninja
-[Chromium](https://www.chromium.org) uses a build system with [GN](https://gn.googlesource.com/gn/+/refs/heads/main/README.md) and [Ninja](https://ninja-build.org/).
+This uses the same build system as [Chromium](https://www.chromium.org):
+[GN](https://gn.googlesource.com/gn/+/refs/heads/main/README.md) + [Ninja](https://ninja-build.org/).
 
 You will have to have my [fork of GMP for Ninja](https://github.com/Alex313031/gmp-ninja) in ./src.
 

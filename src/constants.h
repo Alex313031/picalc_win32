@@ -14,6 +14,13 @@
 #define RGB_YELLOW  RGB(255, 255, 0)
 #define RGB_CYAN    RGB(0, 255, 255)
 #define RGB_MAGENTA RGB(255, 0, 255)
+// Custom colors
+#define RGB_DARKRED     RGB(96, 0, 0)
+#define RGB_DARKGREEN   RGB(0, 96, 0)
+#define RGB_DARKBLUE    RGB(0, 0, 96)
+#define RGB_DARKYELLOW  RGB(96, 96, 0)
+#define RGB_DARKCYAN    RGB(0, 96, 96)
+#define RGB_DARKMAGENTA RGB(96, 0, 96)
 
 // Output file name, written side-by-side with the .exe.
 inline constexpr wchar_t kResultsFile[] = L"picalc_results.txt";
