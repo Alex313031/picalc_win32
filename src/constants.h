@@ -82,6 +82,7 @@ inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 3;
 // cannot be measured (e.g. GetClientRect fails). Dynamic value computed
 // from actual window width at open time; see ComputeWrapWidth in results.cc.
 inline constexpr size_t kResultWrapWidth = 80u;
+inline constexpr int kSeparatorWidth = static_cast<int>(kResultWrapWidth);
 
 inline constexpr UINT kMinNumDigits = 1u;         // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap

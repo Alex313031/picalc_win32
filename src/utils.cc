@@ -628,12 +628,6 @@ bool WriteLineToResultFile(const std::wstring& line) {
   return AppendToResultFile(line + L"\r\n");
 }
 
-bool WriteSeparatorToResultFile() {
-  static constexpr int kSeparatorWidth = 90;
-  static const std::wstring kSep(kSeparatorWidth, L'*');
-  return WriteLineToResultFile(kSep);
-}
-
 // One shot play of embedded .wav file
 bool PlayWav(UINT resid) {
   if (resid < IDR_MAIN) {

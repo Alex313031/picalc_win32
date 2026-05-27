@@ -431,7 +431,6 @@ void SendOutputMessage(const std::wstring& msg) {
 }
 
 void PrintOutputSeparator() {
-  static constexpr int kSeparatorWidth = 90;
   SendOutputMessage(std::wstring(kSeparatorWidth, L'*'));
 }
 

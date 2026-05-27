@@ -339,7 +339,6 @@ namespace {
     const LONGLONG run_start_pos = GetResultFilePosition();
     // Separator at top of results
     PrintOutputSeparator();
-    WriteSeparatorToResultFile();
 
     // Timestamp line, then banner: "Started Calculating N digits (Threads: T)".
     SYSTEMTIME local_time;
@@ -472,7 +471,6 @@ namespace {
     // single-threaded GMP hotspot (after mpf_div above), hence the
     // timing line.
     EmitLine(L"Formatting result to decimal...", false);
-    WriteLineToResultFile(L"Formatting result to decimal...");
     const std::wstring outpi      = FormatPi(pi, digits, kMaxPrintNumDigits);
     const std::wstring outpi_full = FormatPi(pi, digits, digits);
     // Emit truncated Pi to the output area / console.

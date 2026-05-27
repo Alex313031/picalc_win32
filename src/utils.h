@@ -145,10 +145,6 @@ bool TruncateResultFileTo(LONGLONG position);
 // Appends `line` + CRLF to the result file.
 bool WriteLineToResultFile(const std::wstring& line);
 
-// Appends the 90-asterisk separator + CRLF to the result file,
-// matching the width used by PrintOutputSeparator().
-bool WriteSeparatorToResultFile();
-
 // Opens the system run dialog
 void OpenRunDialog(HWND hWnd);
 
