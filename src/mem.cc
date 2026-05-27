@@ -13,6 +13,9 @@ typedef LONG (WINAPI* FnNtQuerySystemInformation)(ULONG, PVOID, ULONG, PULONG);
 // Info class 18: per-pagefile size and usage (page counts).
 static constexpr ULONG kSysPageFileInfo = 18;
 
+// Info class 2: system performance counters (includes ResidentSystemCachePage).
+static constexpr ULONG kSysPerfInfo = 2;
+
 // Info class 21: system file cache stats.
 static constexpr ULONG kSysFileCacheInfo = 21;
 

@@ -45,7 +45,7 @@ inline constexpr INT kResultWindowMinHeight = 100;
 inline constexpr INT kSplitterHeight           = 10;
 inline constexpr INT kSplitterHandleWidth      = 14;
 inline constexpr INT kSplitterHandleHeight     = 1;
-inline constexpr COLORREF kSplitterHandleColor = RGB_GREY;
+inline constexpr COLORREF kSplitterHandleColor = RGB_DKGREY;
 
 // Default to a 1/2 top, 1/2 bottom pane split on first layout.
 // Computed in float so the ratio is explicit.

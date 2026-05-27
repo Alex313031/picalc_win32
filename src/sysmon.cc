@@ -277,7 +277,10 @@ bool CreateSysmonControls(HWND parent) {
     }
   }
 
-  const HFONT hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  HFONT hMonFont = GetFont(0);
+  if (hMonFont == nullptr) {
+    hMonFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  }
   const HWND kFontTargets[] = {
     s_hSysmonGroup,
     s_hCpuGroup,       s_hMemGroup,
@@ -291,7 +294,7 @@ bool CreateSysmonControls(HWND parent) {
     s_hCacheLabel,     s_hCacheValue,
   };
   for (HWND hw : kFontTargets) {
-    SendMessageW(hw, WM_SETFONT, reinterpret_cast<WPARAM>(hGuiFont), MAKELPARAM(FALSE, 0));
+    SendMessageW(hw, WM_SETFONT, reinterpret_cast<WPARAM>(hMonFont), MAKELPARAM(FALSE, 0));
   }
   return true;
 }

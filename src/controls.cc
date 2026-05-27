@@ -273,10 +273,12 @@ bool CreateChildControls(HWND parent) {
     return false;
   }
 
-  // Apply the standard GUI font to every control. Without this they
-  // render in the ancient SYSTEM_FONT (raster "System" face) on Win2k.
-  // DEFAULT_GUI_FONT is a stock object - no cleanup needed.
-  const HFONT hGuiFont      = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  // Apply Tahoma explicitly so the face is consistent across all systems.
+  // Fall back to DEFAULT_GUI_FONT if Tahoma is unavailable.
+  HFONT hGuiFont = GetFont(0);
+  if (hGuiFont == nullptr) {
+    hGuiFont = reinterpret_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  }
   const HWND kFontTargets[] = {
       s_hGroupBox,        hDigitsLabel, hDigitsCombo,   hThreadsLabel,  hThreadsCombo,
       hStartButton,       hStopButton,  hOpenOutButton, hConsoleButton, hClearResultButton,
