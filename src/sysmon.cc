@@ -86,6 +86,20 @@ static void PaintGraph(HDC dc, const RECT& rc) {
   RECT edge_rc = rc;
   DrawEdge(dc, &edge_rc, EDGE_SUNKEN, BF_RECT);
 
+  // Inner rect — everything (grid, fills, lines) is mapped onto this so the
+  // graph stays strictly inside the 2px sunken bevel, matching Task Manager's
+  // graph layout. The clip is a safety net for the polygon fill, whose
+  // bottom-left baseline corner can sit just to the left of inner.left so the
+  // oldest visible sample connects smoothly to the baseline.
+  const RECT inner  = {rc.left + 2, rc.top + 2, rc.right - 2, rc.bottom - 2};
+  const int inner_w = inner.right - inner.left;
+  const int inner_h = inner.bottom - inner.top;
+  if (inner_w <= 0 || inner_h <= 0) {
+    return;
+  }
+  const int saved_dc = SaveDC(dc);
+  IntersectClipRect(dc, inner.left, inner.top, inner.right, inner.bottom);
+
   // Lazy-init all cached GDI objects on first paint.
   if (s_hGridPen == nullptr) {
     s_hGridPen = CreatePen(PS_SOLID, 1, kGraphGridColor);
@@ -108,31 +122,31 @@ static void PaintGraph(HDC dc, const RECT& rc) {
 
   // --- Pass 0: grid ---
   for (int i = 1; i <= 9; ++i) {
-    const int y = i * rc.bottom / 10;
-    MoveToEx(dc, rc.left, y, nullptr);
-    LineTo(dc, rc.right, y);
+    const int y = inner.top + i * inner_h / 10;
+    MoveToEx(dc, inner.left, y, nullptr);
+    LineTo(dc, inner.right, y);
   }
-  if (rc.right > 0) {
-    const int col_w = rc.right / 10;
-    if (col_w > 0) {
-      const int phase = static_cast<int>(s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
-      for (int x = col_w - phase; x < rc.right; x += col_w) {
-        MoveToEx(dc, x, rc.top, nullptr);
-        LineTo(dc, x, rc.bottom);
-      }
+  const int col_w = inner_w / 10;
+  if (col_w > 0) {
+    const int phase = static_cast<int>(s_graph_scroll_x % static_cast<ULONGLONG>(col_w));
+    for (int x = inner.left + col_w - phase; x < inner.right; x += col_w) {
+      MoveToEx(dc, x, inner.top, nullptr);
+      LineTo(dc, x, inner.bottom);
     }
   }
 
   // --- Passes 1–4: filled CPU lines (painter's algorithm) ---
-  if (rc.right > 0 && rc.bottom > 0) {
-    // How many samples fit across the width; capped to buffer size.
-    const int num_visible = rc.right / kGraphScrollStep + 2;
+  {
+    // How many samples fit across the inner width; capped to buffer size.
+    const int num_visible = inner_w / kGraphScrollStep + 2;
     const int actual_pts  = (num_visible < kGraphMaxSamples) ? num_visible : kGraphMaxSamples;
-    const LONG x_newest   = static_cast<LONG>(rc.right) - 1L;
-    const LONG y_base     = static_cast<LONG>(rc.bottom); // one row below visible
+    const LONG x_newest   = static_cast<LONG>(inner.right) - 1L;
+    const LONG y_base     = static_cast<LONG>(inner.bottom); // one row below the inner area
 
-    // pct → y: 0% = rc.bottom-1 (bottom), 100% = 0 (top). Returns LONG so
-    // POINT brace-initializers get {LONG, LONG} with no narrowing conversion.
+    // pct → y: 0% = inner.bottom-1 (bottom row inside bevel),
+    //         100% = inner.top    (top row inside bevel).
+    // Returns LONG so POINT brace-initializers get {LONG, LONG} with no
+    // narrowing conversion.
     auto pct_to_y = [&](float pct) -> LONG {
       if (pct < 0.0f) {
         pct = 0.0f;
@@ -140,8 +154,8 @@ static void PaintGraph(HDC dc, const RECT& rc) {
       if (pct > 100.0f) {
         pct = 100.0f;
       }
-      return static_cast<LONG>(rc.bottom) - 1L -
-             static_cast<LONG>(pct * static_cast<float>(rc.bottom - 1) / 100.0f + 0.5f);
+      return static_cast<LONG>(inner.bottom) - 1L -
+             static_cast<LONG>(pct * static_cast<float>(inner_h - 1) / 100.0f + 0.5f);
     };
 
     // Build polygon point arrays (left-baseline, data pts, right-baseline).
@@ -193,6 +207,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
 
   SelectObject(dc, hOldBrush);
   SelectObject(dc, hOldPen);
+  RestoreDC(dc, saved_dc);
 }
 
 static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
