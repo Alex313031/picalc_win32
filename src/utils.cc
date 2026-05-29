@@ -429,14 +429,15 @@ HWND AddTooltip(HWND hWndParent, HWND hWndControl, HINSTANCE hInst, const wchar_
     return nullptr;
   }
 
-  HWND hTooltip = CreateWindowExW(WS_EX_NOACTIVATE, TOOLTIPS_CLASS, nullptr,
-                                  TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT,
-                                  CW_USEDEFAULT, CW_USEDEFAULT, hWndParent, nullptr, hInst, nullptr);
+  HWND hTooltip = CreateWindowExW(
+      WS_EX_NOACTIVATE, TOOLTIPS_CLASS, nullptr, TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT,
+      CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hWndParent, nullptr, hInst, nullptr);
   if (hTooltip == nullptr) {
     return nullptr;
   }
 
-  TOOLINFOW ti                                = {};
+  TOOLINFOW ti = {};
+  // Windows 2000 even with I.E. 6 reports false, since system comctl32.dll is not updated.
   static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
   if (can_use_582_controls) {
     ti.cbSize = sizeof(ti);
@@ -629,8 +630,9 @@ bool ClearResultFile() {
     return false;
   }
   // Re-write BOM after truncation so the file stays valid UTF-16.
-  DWORD written      = 0;
-  const bool cleared = WriteFile(g_result_file, &kUTF16LEBOM, sizeof(kUTF16LEBOM), &written, nullptr);
+  DWORD written = 0;
+  const bool cleared =
+      WriteFile(g_result_file, &kUTF16LEBOM, sizeof(kUTF16LEBOM), &written, nullptr);
   if (cleared) {
     LOG(INFO) << L"Cleared result file " << kResultsFile;
   }

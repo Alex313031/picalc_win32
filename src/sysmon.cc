@@ -167,8 +167,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
     POINT kernel_poly[kGraphMaxSamples + 4];
 
     total_poly[0] = {
-        x_newest - static_cast<LONG>(actual_pts - 1) * static_cast<LONG>(kGraphScrollStep),
-        y_base};
+        x_newest - static_cast<LONG>(actual_pts - 1) * static_cast<LONG>(kGraphScrollStep), y_base};
     kernel_poly[0] = total_poly[0];
 
     for (int i = 0; i < actual_pts; ++i) {
@@ -176,8 +175,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
       const int sample_age = actual_pts - 1 - i;
       const int idx = ((s_graph_head - 1 - sample_age) % kGraphMaxSamples + kGraphMaxSamples) %
                       kGraphMaxSamples;
-      const LONG x =
-          x_newest - static_cast<LONG>(sample_age) * static_cast<LONG>(kGraphScrollStep);
+      const LONG x = x_newest - static_cast<LONG>(sample_age) * static_cast<LONG>(kGraphScrollStep);
       total_poly[i + 1]  = {x, pct_to_y(s_graph_samples[idx].total_pct)};
       kernel_poly[i + 1] = {x, pct_to_y(s_graph_samples[idx].kernel_pct)};
     }
@@ -420,14 +418,22 @@ bool CreateSysmonControls(HWND parent) {
   };
   const TooltipBinding kTooltipBindings[] = {
       {s_hGraph, kTooltipGraph},
-      {s_hCpuIdleLabel, kTooltipCpuIdle},     {s_hCpuIdleValue, kTooltipCpuIdle},
-      {s_hCpuUserLabel, kTooltipCpuUser},     {s_hCpuUserValue, kTooltipCpuUser},
-      {s_hCpuKernelLabel, kTooltipCpuKernel}, {s_hCpuKernelValue, kTooltipCpuKernel},
-      {s_hCpuUsageLabel, kTooltipCpuTotal},   {s_hCpuUsageValue, kTooltipCpuTotal},
-      {s_hRamLabel, kTooltipRam},             {s_hRamValue, kTooltipRam},
-      {s_hPfLabel, kTooltipPageFile},         {s_hPfValue, kTooltipPageFile},
-      {s_hVmLabel, kTooltipVirtMem},          {s_hVmValue, kTooltipVirtMem},
-      {s_hCacheLabel, kTooltipSysCache},      {s_hCacheValue, kTooltipSysCache},
+      {s_hCpuIdleLabel, kTooltipCpuIdle},
+      {s_hCpuIdleValue, kTooltipCpuIdle},
+      {s_hCpuUserLabel, kTooltipCpuUser},
+      {s_hCpuUserValue, kTooltipCpuUser},
+      {s_hCpuKernelLabel, kTooltipCpuKernel},
+      {s_hCpuKernelValue, kTooltipCpuKernel},
+      {s_hCpuUsageLabel, kTooltipCpuTotal},
+      {s_hCpuUsageValue, kTooltipCpuTotal},
+      {s_hRamLabel, kTooltipRam},
+      {s_hRamValue, kTooltipRam},
+      {s_hPfLabel, kTooltipPageFile},
+      {s_hPfValue, kTooltipPageFile},
+      {s_hVmLabel, kTooltipVirtMem},
+      {s_hVmValue, kTooltipVirtMem},
+      {s_hCacheLabel, kTooltipSysCache},
+      {s_hCacheValue, kTooltipSysCache},
   };
   for (const auto& tb : kTooltipBindings) {
     AddTooltip(parent, tb.hCtrl, g_hInstance, tb.text);

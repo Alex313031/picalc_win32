@@ -868,8 +868,8 @@ bool InitApp(HWND hWnd) {
   }
   SendOutputMessage(GetWelcomeMessage());
   if (is_on_wine) {
-    EmitLine(L"Running on Wine " + ToWide(winever) +
-             L" (NT Version " + GetNTVerString() + L")", false);
+    EmitLine(L"Running on Wine " + ToWide(winever) + L" (NT Version " + GetNTVerString() + L")",
+             false);
   } else {
     EmitLine(L"Windows NT Version " + GetNTVerString(), false);
   }

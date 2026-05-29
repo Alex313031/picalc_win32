@@ -84,8 +84,10 @@ bool IsCommCtrlAtLeast(const DWORD to_compare);
 // tooltip window can't be created. The tooltip text is captured by pointer
 // (TOOLINFOW::lpszText), so the buffer must remain valid for the tooltip's
 // lifetime - pass a string literal or a long-lived constant.
-HWND AddTooltip(HWND hWndParent, HWND hWndControl,
-                HINSTANCE hInst, const wchar_t* tooltipText = L"Dummy tooltip");
+HWND AddTooltip(HWND hWndParent,
+                HWND hWndControl,
+                HINSTANCE hInst,
+                const wchar_t* tooltipText = L"Dummy tooltip");
 
 // Gets if a given menu has an item CHECKED or not.
 bool IsMenuChecked(HMENU menu, UINT id);

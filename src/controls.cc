@@ -184,11 +184,10 @@ bool CreateChildControls(HWND parent) {
   // SS_NOTIFY makes the static return HTCLIENT from WM_NCHITTEST instead of
   // the default HTTRANSPARENT, so WM_MOUSEMOVE reaches the control - required
   // for TTF_SUBCLASS-based hover tooltips to fire when hovering the label.
-  hDigitsLabel = CreateWindowExW(0, WC_STATIC, kNumDigitsLabel,
-                                 dwCHILD | SS_LEFT | SS_CENTERIMAGE | SS_NOTIFY, kRowLeft, row1_y,
-                                 kLabelWidth, kControlHeight, parent,
-                                 reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)),
-                                 g_hInstance, nullptr);
+  hDigitsLabel = CreateWindowExW(
+      0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE | SS_NOTIFY, kRowLeft,
+      row1_y, kLabelWidth, kControlHeight, parent,
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)), g_hInstance, nullptr);
   if (hDigitsLabel == nullptr) {
     return false;
   }
@@ -353,7 +352,7 @@ bool CreateChildControls(HWND parent) {
 
   if (threads_sel >= 0) {
     SendMessageW(hThreadsCombo, CB_SETCURSEL, threads_sel, 0);
-    s_prev_threads_sel             = threads_sel;
+    s_prev_threads_sel        = threads_sel;
     s_threads_custom_injected = false;
   } else {
     // CPU count isn't a standard option - inject it before "Custom".
@@ -362,7 +361,7 @@ bool CreateChildControls(HWND parent) {
     const int insert_at = static_cast<int>(SendMessageW(hThreadsCombo, CB_GETCOUNT, 0, 0)) - 1;
     SendMessageW(hThreadsCombo, CB_INSERTSTRING, insert_at, reinterpret_cast<LPARAM>(cpu_str));
     SendMessageW(hThreadsCombo, CB_SETCURSEL, insert_at, 0);
-    s_prev_threads_sel             = insert_at;
+    s_prev_threads_sel        = insert_at;
     s_threads_custom_injected = true;
   }
 

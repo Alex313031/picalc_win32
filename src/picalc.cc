@@ -368,10 +368,9 @@ namespace {
     const WORD hour_12  = (local_time.wHour % 12 == 0) ? 12 : local_time.wHour % 12;
     const wchar_t* ampm = (local_time.wHour < 12) ? L"AM" : L"PM";
     wchar_t timestamp_buf[32];
-    swprintf(timestamp_buf, ARRAYSIZE(timestamp_buf),
-             L"%02u/%02u/%02u %02u:%02u:%02u %ls", local_time.wMonth,
-             local_time.wDay, local_time.wYear % 100, hour_12, local_time.wMinute,
-             local_time.wSecond, ampm);
+    swprintf(timestamp_buf, ARRAYSIZE(timestamp_buf), L"%02u/%02u/%02u %02u:%02u:%02u %ls",
+             local_time.wMonth, local_time.wDay, local_time.wYear % 100, hour_12,
+             local_time.wMinute, local_time.wSecond, ampm);
     EmitLine(timestamp_buf, false);
     WriteLineToResultFile(timestamp_buf);
     std::wostringstream banner;
