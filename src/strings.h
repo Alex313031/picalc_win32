@@ -1,61 +1,82 @@
 #ifndef PICALCWIN32_STRINGS_H_
 #define PICALCWIN32_STRINGS_H_
 
-#include "framework.h"
+#include "constants.h"
+
+// All UI strings below are defined as const wchar_t[] in strings.cc. The
+// linker places them in .rdata where the PE loader maps them at startup -
+// no allocations, one symbol per string, and a bare address load at the
+// call site (decays to const wchar_t* when passed to Win32 APIs).
 
 // Strings to print
-inline const wchar_t* const kCalculateMessage = L"Started calculating ";
-inline const wchar_t* const kStoppedMessage   = L"Stopped calculating ";
-inline const wchar_t* const kDoneMessage      = L"Done! ";
-inline const wchar_t* const kIterMessage      = L"Num. Iterations: ";
+extern const wchar_t kCalculateMessage[];
+extern const wchar_t kStoppedMessage[];
+extern const wchar_t kDoneMessage[];
+extern const wchar_t kIterMessage[];
 
 // Controls strings
-inline const wchar_t* const kNumDigitsLabel   = L"Number of Digits:";
-inline const wchar_t* const kNumThreadsLabel  = L"Num. CPU Threads:";
-inline const wchar_t* const kStartButtonLabel = L"Calculate!";
-inline const wchar_t* const kStopButtonLabel  = L"Stop";
-inline const wchar_t* const kShowConsoleLabel = L"Show Console";
-inline const wchar_t* const kHideConsoleLabel = L"Hide Console";
-inline const wchar_t* const kOpenResultLabel  = L"Open Result File";
-inline const wchar_t* const kCloseResultLabel = L"Close Result File";
-inline const wchar_t* const kClearResultLabel = L"Clear Result File";
-inline const wchar_t* const kClearOutputLabel = L"Clear Status Pane";
-inline const wchar_t* const kAboutButtonLabel = L"About";
-inline const wchar_t* const kExitButtonLabel  = L"Exit";
-inline const wchar_t* const kCntrlsGroupLabel = L"Controls";
-inline const wchar_t* const kSysmonGroupLabel = L"System Monitor";
-inline const wchar_t* const kCPUGroupLabel    = L"CPU Usage";
-inline const wchar_t* const kMemGroupLabel    = L"MEM Usage";
-inline const wchar_t* const kResultPopupTitle = L"Pi Calculation Results";
-inline const wchar_t* const kRunTitle         = L"Create New Task";
-inline const wchar_t* const kRunPrompt =
-    L"Type the name of a program, folder, or file, and PiCalc will open it for you.";
+extern const wchar_t kNumDigitsLabel[];
+extern const wchar_t kNumThreadsLabel[];
+extern const wchar_t kStartButtonLabel[];
+extern const wchar_t kStopButtonLabel[];
+extern const wchar_t kShowConsoleLabel[];
+extern const wchar_t kHideConsoleLabel[];
+extern const wchar_t kOpenResultLabel[];
+extern const wchar_t kCloseResultLabel[];
+extern const wchar_t kClearResultLabel[];
+extern const wchar_t kClearOutputLabel[];
+extern const wchar_t kAboutButtonLabel[];
+extern const wchar_t kExitButtonLabel[];
+extern const wchar_t kCntrlsGroupLabel[];
+extern const wchar_t kSysmonGroupLabel[];
+extern const wchar_t kCPUGroupLabel[];
+extern const wchar_t kMemGroupLabel[];
+extern const wchar_t kResultPopupTitle[];
+extern const wchar_t kRunTitle[];
+extern const wchar_t kRunPrompt[];
 
 // Dialog strings
-inline const wchar_t* const kDigitsDlgTitle   = L"Custom Digit Count";
-inline const wchar_t* const kThreadsDlgTitle  = L"Custom Thread Count";
-inline const wchar_t* const kDigitsDlgPrompt  = L"Enter number of Digits: ";
-inline const wchar_t* const kThreadsDlgPrompt = L"Enter number of CPU Threads: ";
+extern const wchar_t kDigitsDlgTitle[];
+extern const wchar_t kThreadsDlgTitle[];
+extern const wchar_t kDigitsDlgPrompt[];
+extern const wchar_t kThreadsDlgPrompt[];
+
+// Hover tooltip text. Each control whose tooltip is wired in
+// CreateChildControls / CreateSysmonControls references one of these.
+// TOOLINFOW::lpszText captures the pointer at tooltip-creation time and the
+// string must outlive the tooltip - extern wchar_t[] storage in .rdata
+// satisfies that trivially.
+extern const wchar_t kTooltipDigits[];
+extern const wchar_t kTooltipThreads[];
+extern const wchar_t kTooltipStart[];
+extern const wchar_t kTooltipStop[];
+extern const wchar_t kTooltipOpenPiTxt[];
+extern const wchar_t kTooltipClrResult[];
+extern const wchar_t kTooltipClrOutput[];
+extern const wchar_t kTooltipConsole[];
+extern const wchar_t kTooltipAbout[];
+extern const wchar_t kTooltipExit[];
+extern const wchar_t kTooltipOutput[];
+extern const wchar_t kTooltipGraph[];
+extern const wchar_t kTooltipCpuIdle[];
+extern const wchar_t kTooltipCpuUser[];
+extern const wchar_t kTooltipCpuKernel[];
+extern const wchar_t kTooltipCpuTotal[];
+extern const wchar_t kTooltipRam[];
+extern const wchar_t kTooltipPageFile[];
+extern const wchar_t kTooltipVirtMem[];
+extern const wchar_t kTooltipSysCache[];
 
 // Sysmon metric labels and initial value text
-inline const wchar_t* const kMetricCpuIdle   = L"CPU Idle: ";
-inline const wchar_t* const kMetricCpuUser   = L"CPU User: ";
-inline const wchar_t* const kMetricCpuKernel = L"CPU Kernel: ";
-inline const wchar_t* const kMetricCpuUsage  = L"CPU Total: ";
-inline const wchar_t* const kMetricRam       = L"RAM Usage: ";
-inline const wchar_t* const kMetricPageFile  = L"Page File Usage: ";
-inline const wchar_t* const kMetricVirtMem   = L"Commit Charge: ";
-inline const wchar_t* const kMetricSysCache  = L"System Cache: ";
-inline const wchar_t* const kMetricInitVal   = L"NaN";
-
-// Combobox items: Order = display order.
-inline const wchar_t* const kDigitOptions[] = {
-    // Digit-count options offered in the num digitscombobox.
-    L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"Custom"};
-
-inline const wchar_t* const kThreadsOptions[] = {
-    // Threads options offered in the num cpu threads combobox.
-    L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"Custom"};
+extern const wchar_t kMetricCpuIdle[];
+extern const wchar_t kMetricCpuUser[];
+extern const wchar_t kMetricCpuKernel[];
+extern const wchar_t kMetricCpuUsage[];
+extern const wchar_t kMetricRam[];
+extern const wchar_t kMetricPageFile[];
+extern const wchar_t kMetricVirtMem[];
+extern const wchar_t kMetricSysCache[];
+extern const wchar_t kMetricInitVal[];
 
 // Wide <-> ANSI conversion helpers (CP_ACP; returns empty string on null/error).
 std::string ToANSI(const wchar_t* in);

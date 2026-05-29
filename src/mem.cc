@@ -5,11 +5,11 @@
 #include "utils.h"
 
 // GlobalMemoryStatusEx is XP+; GlobalMemoryStatus is Win2K fallback.
-// Both are in kernel32.dll — GlobalMemoryStatusEx is resolved dynamically
+// Both are in kernel32.dll: GlobalMemoryStatusEx is resolved dynamically
 // so a missing IAT entry doesn't crash the Win2K loader.
 typedef BOOL(WINAPI* FnGlobalMemoryStatusEx)(LPMEMORYSTATUSEX);
 
-// NtQuerySystemInformation from ntdll.dll — NT-native, available on Win2K.
+// NtQuerySystemInformation from ntdll.dll: NT-native, available on Win2K.
 typedef LONG(WINAPI* FnNtQuerySystemInformation)(ULONG, PVOID, ULONG, PULONG);
 
 // Info class 18: per-pagefile size and usage (page counts).
@@ -49,7 +49,7 @@ static FnGlobalMemoryStatusEx ResolveGlobalMemStatEx() {
   static FnGlobalMemoryStatusEx pfn = nullptr;
   static bool s_resolved            = false;
   if (!s_resolved) {
-    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    HMODULE hKernel32 = GetModuleHandleW(kKernel32Dll);
     if (hKernel32 != nullptr) {
       pfn = reinterpret_cast<FnGlobalMemoryStatusEx>(
           GetProcAddress(hKernel32, "GlobalMemoryStatusEx"));
@@ -63,7 +63,7 @@ static FnNtQuerySystemInformation ResolveNtQuery() {
   static FnNtQuerySystemInformation pfn = nullptr;
   static bool s_resolved                = false;
   if (!s_resolved) {
-    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    HMODULE hNtdll = GetModuleHandleW(kNtDll);
     if (hNtdll != nullptr) {
       pfn = reinterpret_cast<FnNtQuerySystemInformation>(
           GetProcAddress(hNtdll, "NtQuerySystemInformation"));
@@ -144,10 +144,10 @@ bool UpdateMemStats(MemStats* out) {
       any_ok        = true;
     }
 
-    // Cache queries don't work on Wine — skip them so the display shows NaN.
+    // Cache queries don't work on Wine: skip them so the display shows NaN.
     static const bool s_is_wine = IsRunningOnWine();
     if (!s_is_wine) {
-      // Physically resident cache pages — matches Task Manager "System Cache".
+      // Physically resident cache pages - matches Task Manager "System Cache".
       // SYSTEM_PERFORMANCE_INFORMATION is ~296-320 bytes depending on OS version;
       // NtQuerySI(2) returns STATUS_INFO_LENGTH_MISMATCH if the buffer is too small,
       // so use 512 bytes to cover all versions. Then read ResidentSystemCachePage
@@ -164,7 +164,7 @@ bool UpdateMemStats(MemStats* out) {
         any_ok           = true;
       }
 
-      // Cache peak and limit from class 21 (CurrentSize not used — see class 2 above).
+      // Cache peak and limit from class 21 (CurrentSize not used - see class 2 above).
       SysFileCacheInfo ci = {};
       ULONG returned      = 0;
       LONG status = pfnNtQuery(kSysFileCacheInfo, &ci, static_cast<ULONG>(sizeof(ci)), &returned);

@@ -48,7 +48,7 @@
 #define IDC_THREADS_COMBO           605
 #define IDC_START_BUTTON            606 // "Calculate!" button
 #define IDC_STOP_BUTTON             607
-#define IDC_OPENOUT_BUTTON          608
+#define IDC_RESULT                  608 // "Open Result File" button
 #define IDC_ABOUT_BUTTON            609
 #define IDC_CONSOLE_BUTTON          610
 #define IDC_EXIT_BUTTON             611

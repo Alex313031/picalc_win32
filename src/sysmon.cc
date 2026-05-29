@@ -13,13 +13,13 @@ static HWND s_hGraph       = nullptr;
 
 // CPU and memory metric sub-groupboxes (children of parent/main window).
 // Created before the metric controls so they are lower in Z-order and painted
-// first — the standard Win32 dialog pattern for groupboxes with sibling labels.
+// first - the standard Win32 dialog pattern for groupboxes with sibling labels.
 // No WS_CLIPSIBLINGS: with it the groupbox clips out the metric controls (which
 // are higher-Z siblings) and the frame becomes invisible.
 static HWND s_hCpuGroup = nullptr;
 static HWND s_hMemGroup = nullptr;
 
-// CPU metric label + value statics — children of parent, siblings of sub-groupboxes.
+// CPU metric label + value statics - children of parent, siblings of sub-groupboxes.
 // Order top-to-bottom: Idle, User, Kernel, Total.
 static HWND s_hCpuIdleLabel   = nullptr;
 static HWND s_hCpuIdleValue   = nullptr;
@@ -30,7 +30,7 @@ static HWND s_hCpuKernelValue = nullptr;
 static HWND s_hCpuUsageLabel  = nullptr;
 static HWND s_hCpuUsageValue  = nullptr;
 
-// Memory metric label + value statics — children of parent, siblings of sub-groupboxes.
+// Memory metric label + value statics - children of parent, siblings of sub-groupboxes.
 static HWND s_hRamLabel   = nullptr;
 static HWND s_hRamValue   = nullptr;
 static HWND s_hPfLabel    = nullptr;
@@ -47,7 +47,7 @@ static const wchar_t* kGraphClassName = L"PicalcGraph";
 static ULONGLONG s_graph_scroll_x = 0;
 
 // ---------------------------------------------------------------------------
-// Graph sample ring buffer — zero-initialised so the graph shows a flat 0%
+// Graph sample ring buffer: zero-initialised so the graph shows a flat 0%
 // line before the first real tick and ramps up naturally as data arrives.
 // ---------------------------------------------------------------------------
 static constexpr int kGraphMaxSamples = 2048;
@@ -61,7 +61,7 @@ static GraphSample s_graph_samples[kGraphMaxSamples] = {};
 static int s_graph_head                              = 0; // index of next write slot (circular)
 
 // ---------------------------------------------------------------------------
-// Cached GDI objects — created once on first paint, freed in WM_DESTROY.
+// Cached GDI object: created once on first paint, freed in WM_DESTROY.
 // ---------------------------------------------------------------------------
 static HPEN s_hGridPen           = nullptr;
 static HPEN s_hTotalLinePen      = nullptr;
@@ -70,7 +70,7 @@ static HBRUSH s_hTotalFillBrush  = nullptr;
 static HBRUSH s_hKernelFillBrush = nullptr;
 
 // ---------------------------------------------------------------------------
-// Double-buffer backbuffer — recreated on WM_SIZE, blitted to screen in WM_PAINT.
+// Double-buffer backbuffer: recreated on WM_SIZE, blitted to screen in WM_PAINT.
 // ---------------------------------------------------------------------------
 static HDC s_hMemDC         = nullptr;
 static HBITMAP s_hMemBmp    = nullptr;
@@ -86,7 +86,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
   RECT edge_rc = rc;
   DrawEdge(dc, &edge_rc, EDGE_SUNKEN, BF_RECT);
 
-  // Inner rect — everything (grid, fills, lines) is mapped onto this so the
+  // Inner rect: everything (grid, fills, lines) is mapped onto this so the
   // graph stays strictly inside the 2px sunken bevel, matching Task Manager's
   // graph layout. The clip is a safety net for the polygon fill, whose
   // bottom-left baseline corner can sit just to the left of inner.left so the
@@ -135,7 +135,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
     }
   }
 
-  // --- Passes 1–4: filled CPU lines (painter's algorithm) ---
+  // --- Passes 1-4: filled CPU lines (painter's algorithm) ---
   {
     // How many samples fit across the inner width; capped to buffer size.
     const int num_visible = inner_w / kGraphScrollStep + 2;
@@ -143,7 +143,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
     const LONG x_newest   = static_cast<LONG>(inner.right) - 1L;
     const LONG y_base     = static_cast<LONG>(inner.bottom); // one row below the inner area
 
-    // pct → y: 0% = inner.bottom-1 (bottom row inside bevel),
+    // pct -> y: 0% = inner.bottom-1 (bottom row inside bevel),
     //         100% = inner.top    (top row inside bevel).
     // Returns LONG so POINT brace-initializers get {LONG, LONG} with no
     // narrowing conversion.
@@ -172,7 +172,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
     kernel_poly[0] = total_poly[0];
 
     for (int i = 0; i < actual_pts; ++i) {
-      // i=0 → oldest visible; i=actual_pts-1 → newest.
+      // i=0 -> oldest visible; i=actual_pts-1 -> newest.
       const int sample_age = actual_pts - 1 - i;
       const int idx = ((s_graph_head - 1 - sample_age) % kGraphMaxSamples + kGraphMaxSamples) %
                       kGraphMaxSamples;
@@ -191,7 +191,7 @@ static void PaintGraph(HDC dc, const RECT& rc) {
     SelectObject(dc, s_hTotalFillBrush);
     Polygon(dc, total_poly, poly_count);
 
-    // Pass 2: total line — before any kernel painting so kernel is always on top.
+    // Pass 2: total line - before any kernel painting so kernel is always on top.
     SelectObject(dc, s_hTotalLinePen);
     Polyline(dc, total_poly + 1, actual_pts);
 
@@ -361,9 +361,12 @@ bool CreateSysmonControls(HWND parent) {
 
   // Metric controls are siblings of the sub-groupboxes (both children of parent).
   // They are created AFTER the sub-groupboxes so they sit higher in Z-order and
-  // paint on top of the groupbox frames — the standard Win32 dialog pattern.
-  static constexpr DWORD kLabelStyle = dwCHILD | SS_LEFT | SS_CENTERIMAGE;
-  static constexpr DWORD kValueStyle = dwCHILD | SS_RIGHT | SS_CENTERIMAGE;
+  // paint on top of the groupbox frames - the standard Win32 dialog pattern.
+  // SS_NOTIFY makes the static return HTCLIENT from WM_NCHITTEST instead of
+  // the default HTTRANSPARENT, so WM_MOUSEMOVE actually reaches the control -
+  // required for TTF_SUBCLASS-based hover tooltips to fire.
+  static constexpr DWORD kLabelStyle = dwCHILD | SS_LEFT | SS_CENTERIMAGE | SS_NOTIFY;
+  static constexpr DWORD kValueStyle = dwCHILD | SS_RIGHT | SS_CENTERIMAGE | SS_NOTIFY;
 
   struct MetricDef {
     HWND* label_hwnd;
@@ -407,6 +410,27 @@ bool CreateSysmonControls(HWND parent) {
   };
   for (HWND hw : kFontTargets) {
     SendMessageW(hw, WM_SETFONT, reinterpret_cast<WPARAM>(hMonFont), MAKELPARAM(FALSE, 0));
+  }
+
+  // Hover tooltips: each metric row (label + value) shares one string so a
+  // hover anywhere on the row surfaces the same hint. The graph gets its own.
+  struct TooltipBinding {
+    HWND hCtrl;
+    const wchar_t* text;
+  };
+  const TooltipBinding kTooltipBindings[] = {
+      {s_hGraph, kTooltipGraph},
+      {s_hCpuIdleLabel, kTooltipCpuIdle},     {s_hCpuIdleValue, kTooltipCpuIdle},
+      {s_hCpuUserLabel, kTooltipCpuUser},     {s_hCpuUserValue, kTooltipCpuUser},
+      {s_hCpuKernelLabel, kTooltipCpuKernel}, {s_hCpuKernelValue, kTooltipCpuKernel},
+      {s_hCpuUsageLabel, kTooltipCpuTotal},   {s_hCpuUsageValue, kTooltipCpuTotal},
+      {s_hRamLabel, kTooltipRam},             {s_hRamValue, kTooltipRam},
+      {s_hPfLabel, kTooltipPageFile},         {s_hPfValue, kTooltipPageFile},
+      {s_hVmLabel, kTooltipVirtMem},          {s_hVmValue, kTooltipVirtMem},
+      {s_hCacheLabel, kTooltipSysCache},      {s_hCacheValue, kTooltipSysCache},
+  };
+  for (const auto& tb : kTooltipBindings) {
+    AddTooltip(parent, tb.hCtrl, g_hInstance, tb.text);
   }
   return true;
 }
@@ -461,13 +485,13 @@ void OnSysmonTick(HWND hWnd) {
     s_cpu_stats = cpu;
     wchar_t buf[32];
     auto set_val = [&](UINT id, float pct) {
-      swprintf(buf, 32, L"%.2f%%", static_cast<double>(pct));
+      swprintf(buf, ARRAYSIZE(buf), L"%.2f%%", static_cast<double>(pct));
       HWND hw = GetDlgItem(hWnd, static_cast<int>(id));
       if (hw == nullptr) {
         return;
       }
       wchar_t cur[32] = {};
-      GetWindowTextW(hw, cur, 32);
+      GetWindowTextW(hw, cur, ARRAYSIZE(cur));
       if (wcscmp(cur, buf) != 0) {
         SetWindowTextW(hw, buf);
       }
@@ -478,7 +502,7 @@ void OnSysmonTick(HWND hWnd) {
     set_val(IDC_CPUTOTAL, s_cpu_stats.total_pct);
   }
 
-  // Record graph sample. Uses current s_cpu_stats — zeroed until the first
+  // Record graph sample. Uses current s_cpu_stats: zeroed until the first
   // successful UpdateCpuStats call, which gives the "ramps up from 0" effect.
   s_graph_samples[s_graph_head] = {s_cpu_stats.total_pct, s_cpu_stats.kernel_pct};
   s_graph_head                  = (s_graph_head + 1) % kGraphMaxSamples;
@@ -494,20 +518,20 @@ void OnSysmonTick(HWND hWnd) {
         return;
       }
       wchar_t cur[48] = {};
-      GetWindowTextW(hw, cur, 48);
+      GetWindowTextW(hw, cur, ARRAYSIZE(cur));
       if (wcscmp(cur, str) != 0) {
         SetWindowTextW(hw, str);
       }
     };
-    FormatBytesPair(buf, 48, s_mem_stats.ram_used, s_mem_stats.ram_total);
+    FormatBytesPair(buf, ARRAYSIZE(buf), s_mem_stats.ram_used, s_mem_stats.ram_total);
     set_str(IDC_RAMTOTAL, buf);
     if (s_mem_stats.pf_limit > 0ULL) {
-      FormatBytesPair(buf, 48, s_mem_stats.pf_used, s_mem_stats.pf_limit);
+      FormatBytesPair(buf, ARRAYSIZE(buf), s_mem_stats.pf_used, s_mem_stats.pf_limit);
     } else {
-      swprintf(buf, 48, L"NaN");
+      swprintf(buf, ARRAYSIZE(buf), L"NaN");
     }
     set_str(IDC_PFTOTAL, buf);
-    FormatBytesPair(buf, 48, s_mem_stats.vm_used, s_mem_stats.vm_limit);
+    FormatBytesPair(buf, ARRAYSIZE(buf), s_mem_stats.vm_used, s_mem_stats.vm_limit);
     set_str(IDC_VMTOTAL, buf);
     // (SIZE_T)-1 is the sentinel Windows uses for "system-managed / no fixed
     // cap". When there is a finite cap, show "used / cap"; when uncapped, fall
@@ -515,12 +539,12 @@ void OnSysmonTick(HWND hWnd) {
     // every other metric.
     static const ULONGLONG kCacheLimitUnlimited = static_cast<ULONGLONG>(static_cast<SIZE_T>(-1));
     if (s_mem_stats.cache_bytes == 0ULL) {
-      swprintf(buf, 48, L"NaN");
+      swprintf(buf, ARRAYSIZE(buf), L"NaN");
     } else if (s_mem_stats.cache_limit != kCacheLimitUnlimited && s_mem_stats.cache_limit > 0ULL) {
-      FormatBytesPair(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
+      FormatBytesPair(buf, ARRAYSIZE(buf), static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
                       s_mem_stats.cache_limit);
     } else {
-      FormatBytesPair(buf, 48, static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
+      FormatBytesPair(buf, ARRAYSIZE(buf), static_cast<ULONGLONG>(s_mem_stats.cache_bytes),
                       s_mem_stats.vm_limit);
     }
     set_str(IDC_CACHETOTAL, buf);

@@ -8,7 +8,7 @@
 struct MemStats {
   ULONGLONG ram_used;    // physical memory in use (bytes)
   ULONGLONG ram_total;   // total physical memory installed (bytes)
-  ULONGLONG pf_used;     // commit charge in use — matches Task Manager "Page File" bar (bytes)
+  ULONGLONG pf_used;     // commit charge in use - matches Task Manager "Page File" bar (bytes)
   ULONGLONG pf_limit;    // commit limit: RAM + pagefile combined (bytes)
   ULONGLONG vm_used;     // same as pf_used (commit charge = virtual memory committed)
   ULONGLONG vm_limit;    // same as pf_limit (commit limit)

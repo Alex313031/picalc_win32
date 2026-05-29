@@ -89,7 +89,7 @@ namespace {
 
   // Background sqrt(10005) worker and its heap-allocated argument block.
   // Heap allocation lets CalcThreadProc bail on stop without waiting for
-  // the sqrt to finish — StartCalculation joins and frees it before the
+  // the sqrt to finish - StartCalculation joins and frees it before the
   // next precision change so two sqrt workers never overlap.
   HANDLE g_sqrt_thread  = nullptr;
   SqrtArgs* g_sqrt_args = nullptr;
@@ -227,7 +227,7 @@ namespace {
     }
     // Fourth mul on the current thread so we don't waste it blocking.
     mpz_class t_right = left_pqt.P * right_pqt.T;
-    // Always join the workers — they hold pointers into muls[] on our stack.
+    // Always join the workers because they hold pointers into muls[] on our stack.
     for (int mul_idx = 0; mul_idx < 3; ++mul_idx) {
       if (handles[mul_idx] == nullptr) {
         // CreateThread failed - do this one inline too.
@@ -368,7 +368,8 @@ namespace {
     const WORD hour_12  = (local_time.wHour % 12 == 0) ? 12 : local_time.wHour % 12;
     const wchar_t* ampm = (local_time.wHour < 12) ? L"AM" : L"PM";
     wchar_t timestamp_buf[32];
-    swprintf(timestamp_buf, 32, L"%02u/%02u/%02u %02u:%02u:%02u %ls", local_time.wMonth,
+    swprintf(timestamp_buf, ARRAYSIZE(timestamp_buf),
+             L"%02u/%02u/%02u %02u:%02u:%02u %ls", local_time.wMonth,
              local_time.wDay, local_time.wYear % 100, hour_12, local_time.wMinute,
              local_time.wSecond, ampm);
     EmitLine(timestamp_buf, false);
@@ -442,7 +443,7 @@ namespace {
         EmitLine(line.str(), false);
       }
     } else {
-      // CreateThread failed — run sqrt inline and log it as a stage.
+      // CreateThread failed - run sqrt inline and log it as a stage.
       const DWORD sq_start = GetTickCount();
       mpf_sqrt_ui(g_sqrt_args->sqrt_result.get_mpf_t(), 10005);
       std::wostringstream line;
@@ -508,7 +509,7 @@ namespace {
     const bool done = FlushResultFile();
     // Notify the UI thread to refresh the result viewer. PostMessageW is used
     // (not SendMessage / direct call) so the worker thread never blocks waiting
-    // for the UI thread to process the update — the hang root cause on Wine.
+    // for the UI thread to process the update, the probable hang root cause on Wine.
     if (done) {
       PostMessageW(mainHwnd, WM_PICALC_RELOAD_RESULTS, 0, 0);
     }

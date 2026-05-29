@@ -305,13 +305,13 @@ const std::wstring GetAppName() {
 }
 
 bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build) {
-  HMODULE hNtDll = GetModuleHandleW(L"ntdll.dll");
+  HMODULE hNtDll = GetModuleHandleW(kNtDll);
   if (hNtDll == nullptr) {
     return false;
   }
 
   // Primary: RtlGetNtVersionNumbers (XP+, undocumented). Packs a build-type
-  // flag into the top 4 bits of buildVer — mask them off so callers see the
+  // flag into the top 4 bits of buildVer - mask them off so callers see the
   // plain build number (e.g. 2600 for XP SP3, 19045 for Win10 22H2).
   const RtlGetNtVersionNumbers_t pfnRtlGetNtVersionNumbers =
       reinterpret_cast<RtlGetNtVersionNumbers_t>(GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
@@ -385,7 +385,6 @@ const std::wstring GetNTVerString() {
 }
 
 static DWORD GetCommCtrlVersion() {
-  static const wchar_t* kComCtl32Dll = L"comctl32.dll";
   // Resolve the system comctl32.dll path explicitly. GetSystemDirectoryW
   // returns 0 on failure, or >= MAX_PATH if our buffer was too small (in
   // which case it reports the required size). Either is fatal for us -
@@ -423,6 +422,38 @@ static DWORD GetCommCtrlVersion() {
 bool IsCommCtrlAtLeast(const DWORD to_compare) {
   const DWORD kCommCtrlVer = GetCommCtrlVersion();
   return kCommCtrlVer >= to_compare;
+}
+
+HWND AddTooltip(HWND hWndParent, HWND hWndControl, HINSTANCE hInst, const wchar_t* tooltipText) {
+  if (hWndParent == nullptr || hWndControl == nullptr || tooltipText == nullptr) {
+    return nullptr;
+  }
+
+  HWND hTooltip = CreateWindowExW(WS_EX_NOACTIVATE, TOOLTIPS_CLASS, nullptr,
+                                  TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT,
+                                  CW_USEDEFAULT, CW_USEDEFAULT, hWndParent, nullptr, hInst, nullptr);
+  if (hTooltip == nullptr) {
+    return nullptr;
+  }
+
+  TOOLINFOW ti                                = {};
+  static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
+  if (can_use_582_controls) {
+    ti.cbSize = sizeof(ti);
+  } else {
+    // MinGW's TOOLINFOW always includes lpReserved (V3 layout). Windows 2000's
+    // comctl32 v5.81 only supports up to V2 (through lParam) - passing
+    // sizeof(ti) makes TTM_ADDTOOLW reject the struct on Win2k. Fall back to
+    // the V2 size on pre-XP systems.
+    ti.cbSize = TTTOOLINFOW_V2_SIZE;
+  }
+  ti.uFlags   = TTF_SUBCLASS | TTF_IDISHWND;
+  ti.hwnd     = hWndParent;
+  ti.uId      = reinterpret_cast<UINT_PTR>(hWndControl);
+  ti.lpszText = const_cast<wchar_t*>(tooltipText);
+
+  SendMessageW(hTooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
+  return hTooltip;
 }
 
 // Menu-state helpers. The .rc's CHECKED flags double as default-setting
@@ -548,7 +579,7 @@ bool OpenResultFile() {
   if (path.length() >= MAX_PATH) {
     return false;
   }
-  // CREATE_ALWAYS: each run starts with a fresh file — one result at a time.
+  // CREATE_ALWAYS: each run starts with a fresh file - one result at a time.
   // FILE_ATTRIBUTE_NORMAL (no FILE_FLAG_WRITE_THROUGH) lets the OS buffer
   // writes in the page cache; critical for sequential million-digit output
   // where per-write kernel flushes would dominate wall time.
@@ -562,9 +593,8 @@ bool OpenResultFile() {
     return false;
   }
   // Write UTF-16 LE BOM (FF FE) so readers know the encoding.
-  static const WORD kBOM = 0xFEFF;
-  DWORD written          = 0;
-  if (!WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr)) {
+  DWORD written = 0;
+  if (!WriteFile(g_result_file, &kUTF16LEBOM, sizeof(kUTF16LEBOM), &written, nullptr)) {
     CloseResultFile();
     return false;
   }
@@ -599,9 +629,12 @@ bool ClearResultFile() {
     return false;
   }
   // Re-write BOM after truncation so the file stays valid UTF-16.
-  static const WORD kBOM = 0xFEFF;
-  DWORD written          = 0;
-  return WriteFile(g_result_file, &kBOM, sizeof(kBOM), &written, nullptr);
+  DWORD written      = 0;
+  const bool cleared = WriteFile(g_result_file, &kUTF16LEBOM, sizeof(kUTF16LEBOM), &written, nullptr);
+  if (cleared) {
+    LOG(INFO) << L"Cleared result file " << kResultsFile;
+  }
+  return cleared;
 }
 
 bool FlushResultFile() {
@@ -696,7 +729,7 @@ void OpenRunDialog(HWND hWnd) {
 }
 
 bool IsRunningOnWine(std::string* outWineVer) {
-  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  HMODULE ntdll = GetModuleHandleW(kNtDll);
   if (ntdll == nullptr) {
     return false;
   }

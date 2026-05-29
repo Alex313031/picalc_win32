@@ -181,8 +181,12 @@ bool CreateChildControls(HWND parent) {
   constexpr int kRowLeft     = kAreaCenterX - kRowWidth / 2;
   constexpr int kRowCol2     = kRowLeft + kLabelWidth + kHGap;
 
-  hDigitsLabel = CreateWindowExW(0, WC_STATIC, kNumDigitsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE,
-                                 kRowLeft, row1_y, kLabelWidth, kControlHeight, parent,
+  // SS_NOTIFY makes the static return HTCLIENT from WM_NCHITTEST instead of
+  // the default HTTRANSPARENT, so WM_MOUSEMOVE reaches the control - required
+  // for TTF_SUBCLASS-based hover tooltips to fire when hovering the label.
+  hDigitsLabel = CreateWindowExW(0, WC_STATIC, kNumDigitsLabel,
+                                 dwCHILD | SS_LEFT | SS_CENTERIMAGE | SS_NOTIFY, kRowLeft, row1_y,
+                                 kLabelWidth, kControlHeight, parent,
                                  reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_DIGITS_LABEL)),
                                  g_hInstance, nullptr);
   if (hDigitsLabel == nullptr) {
@@ -198,8 +202,8 @@ bool CreateChildControls(HWND parent) {
   }
 
   hThreadsLabel = CreateWindowExW(
-      0, WC_STATIC, kNumThreadsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE, kRowLeft, row2_y,
-      kLabelWidth, kControlHeight, parent,
+      0, WC_STATIC, kNumThreadsLabel, dwCHILD | SS_LEFT | SS_CENTERIMAGE | SS_NOTIFY, kRowLeft,
+      row2_y, kLabelWidth, kControlHeight, parent,
       reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_THREADS_LABEL)), g_hInstance, nullptr);
   if (hThreadsLabel == nullptr) {
     return false;
@@ -236,7 +240,7 @@ bool CreateChildControls(HWND parent) {
   hOpenOutButton = CreateWindowExW(
       0, WC_BUTTON, kOpenResultLabel, dwCHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_CENTER | BS_VCENTER,
       kRowLeft, row4_y, kButtonWidth, kButtonHeight, parent,
-      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_OPENOUT_BUTTON)), g_hInstance, nullptr);
+      reinterpret_cast<HMENU>(static_cast<UINT_PTR>(IDC_RESULT)), g_hInstance, nullptr);
   if (hOpenOutButton == nullptr) {
     return false;
   }
@@ -305,6 +309,26 @@ bool CreateChildControls(HWND parent) {
   SendMessageW(hOutputEdit, WM_SETFONT, reinterpret_cast<WPARAM>(hOutputFont),
                MAKELPARAM(FALSE, 0));
 
+  // Hover tooltips - paired label+combo controls share one string so a hover
+  // anywhere on the row surfaces the same hint. Tooltips on a CBS_DROPDOWNLIST
+  // combo attach to the combo's HWND.
+  struct TooltipBinding {
+    HWND hCtrl;
+    const wchar_t* text;
+  };
+  const TooltipBinding kTooltipBindings[] = {
+      {hDigitsLabel, kTooltipDigits},          {hDigitsCombo, kTooltipDigits},
+      {hThreadsLabel, kTooltipThreads},        {hThreadsCombo, kTooltipThreads},
+      {hStartButton, kTooltipStart},           {hStopButton, kTooltipStop},
+      {hOpenOutButton, kTooltipOpenPiTxt},     {hClearResultButton, kTooltipClrResult},
+      {hClearOutputButton, kTooltipClrOutput}, {hConsoleButton, kTooltipConsole},
+      {hAboutButton, kTooltipAbout},           {hExitButton, kTooltipExit},
+      {hOutputEdit, kTooltipOutput},
+  };
+  for (const auto& tb : kTooltipBindings) {
+    AddTooltip(parent, tb.hCtrl, g_hInstance, tb.text);
+  }
+
   for (const wchar_t* opt : kDigitOptions) {
     SendMessageW(hDigitsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
   }
@@ -332,7 +356,7 @@ bool CreateChildControls(HWND parent) {
     s_prev_threads_sel             = threads_sel;
     s_threads_custom_injected = false;
   } else {
-    // CPU count isn't a standard option — inject it before "Custom".
+    // CPU count isn't a standard option - inject it before "Custom".
     wchar_t cpu_str[16];
     swprintf(cpu_str, ARRAYSIZE(cpu_str), L"%u", cpu_count);
     const int insert_at = static_cast<int>(SendMessageW(hThreadsCombo, CB_GETCOUNT, 0, 0)) - 1;
@@ -385,13 +409,13 @@ static INT_PTR CALLBACK CustomInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
       if (ctrl == IDOK) {
         auto* params    = reinterpret_cast<CustomInputParams*>(GetWindowLongPtrW(hDlg, DWLP_USER));
         wchar_t buf[32] = {};
-        GetDlgItemTextW(hDlg, IDC_CUSTOM_EDIT, buf, 32);
+        GetDlgItemTextW(hDlg, IDC_CUSTOM_EDIT, buf, ARRAYSIZE(buf));
         wchar_t* end            = nullptr;
         const unsigned long val = wcstoul(buf, &end, 10);
         if (end == buf || *end != L'\0' || val < params->min_val || val > params->max_val) {
           wchar_t errmsg[128];
-          swprintf(errmsg, 128, L"Enter a whole number between %u and %u.", params->min_val,
-                   params->max_val);
+          swprintf(errmsg, ARRAYSIZE(errmsg), L"Enter a whole number between %u and %u.",
+                   params->min_val, params->max_val);
           WarnBox(hDlg, params->title, errmsg);
           SetFocus(GetDlgItem(hDlg, IDC_CUSTOM_EDIT));
           SendDlgItemMessageW(hDlg, IDC_CUSTOM_EDIT, EM_SETSEL, 0, -1);
@@ -435,7 +459,7 @@ void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     }
     return;
   }
-  // "Custom" was selected — show the input dialog.
+  // "Custom" was selected - show the input dialog.
   CustomInputParams params = {};
   if (is_digits) {
     params.title      = kDigitsDlgTitle;
@@ -455,7 +479,7 @@ void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam) {
   if (res == IDOK) {
     // Format the validated value and inject it just before "Custom".
     wchar_t val_str[32];
-    swprintf(val_str, 32, L"%u", params.result);
+    swprintf(val_str, ARRAYSIZE(val_str), L"%u", params.result);
     // Remove any previously injected custom item (always at count-2
     // when injected == true, because "Custom" stays last).
     bool& injected = is_digits ? s_digits_custom_injected : s_threads_custom_injected;
@@ -601,7 +625,7 @@ void LayoutChildren(HWND parent) {
   if (hdwp != nullptr) {
     EndDeferWindowPos(hdwp);
   }
-  // Splitter drags only call LayoutChildren — no WM_SIZE fires, so the
+  // Splitter drags only call LayoutChildren: no WM_SIZE fires, so the
   // system won't trigger a parent repaint automatically. Invalidate here
   // so the parent erases the old groupbox border before the groupbox
   // repaints at its new size. Without WS_CLIPCHILDREN the parent can

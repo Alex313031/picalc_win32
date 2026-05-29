@@ -22,8 +22,24 @@
 #define RGB_DARKCYAN    RGB(0, 96, 96)
 #define RGB_DARKMAGENTA RGB(96, 0, 96)
 
+// Define for below, so that we can reuse the name in literals easily
+#define PI_TXT_NAME L"picalc_results.txt"
+
 // Output file name, written side-by-side with the .exe.
-inline constexpr wchar_t kResultsFile[] = L"picalc_results.txt";
+inline constexpr wchar_t kResultsFile[] = PI_TXT_NAME;
+
+// UTF-16 LE byte-order mark. Written as the first two bytes of the result file
+// so Notepad / other readers know the encoding. The 0xFEFF code unit
+// serializes to FF FE on disk for little-endian. Address-of works because
+// inline constexpr variables have a unique address per program.
+inline constexpr WORD kUTF16LEBOM = 0xFEFF;
+
+// Names of the system DLLs we dynamically resolve symbols from. Centralized
+// so a typo only has to be fixed once and so call sites read by intent
+// (kNtDll) rather than literal ("ntdll.dll").
+inline constexpr wchar_t kNtDll[]       = L"ntdll.dll";
+inline constexpr wchar_t kKernel32Dll[] = L"kernel32.dll";
+inline constexpr wchar_t kComCtl32Dll[] = L"comctl32.dll";
 
 // Default desired outer window size at startup.
 inline constexpr INT CW_WIDTH  = 800;
@@ -55,7 +71,7 @@ inline constexpr float kTopPaneFraction = 1.0f / 2.0f;
 inline constexpr INT kGroupMargin = 7; // groupbox outer margin: left, right, bottom
 inline constexpr INT kGroupOuterTop =
     10; // groupbox outer margin: top (distance from client top to frame line)
-inline constexpr INT kGroupInnerPad = 10; // inner padding: frame line → first control row
+inline constexpr INT kGroupInnerPad = 10; // inner padding: frame line -> first control row
 inline constexpr INT kPadLeft       = 14;
 inline constexpr INT kPadTop        = 14;
 inline constexpr INT kHGap          = 5;
@@ -99,6 +115,17 @@ inline constexpr INT kMinBottomHeight = CW_MINHEIGHT / 3;
 // from actual window width at open time; see ComputeWrapWidth in results.cc.
 inline constexpr size_t kResultWrapWidth = 80u;
 inline constexpr int kSeparatorWidth     = static_cast<int>(kResultWrapWidth);
+
+// Combobox option items: Order = display order. Kept inline (not extern) because
+// the size has to be visible at call sites for range-for and ARRAYSIZE; the
+// elements themselves are still pointers to .rdata literals.
+inline const wchar_t* const kDigitOptions[] = {
+    // Digit-count options offered in the num digitscombobox.
+    L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"Custom"};
+
+inline const wchar_t* const kThreadsOptions[] = {
+    // Threads options offered in the num cpu threads combobox.
+    L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"Custom"};
 
 inline constexpr UINT kMinNumDigits = 1u;         // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap

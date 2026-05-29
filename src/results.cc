@@ -78,7 +78,7 @@ static std::wstring LoadResultContent() {
 bool RegisterResultWindowClass(HINSTANCE hInstance) {
   WNDCLASSEXW wc   = {};
   wc.cbSize        = sizeof(wc);
-  wc.style         = 0; // No CS_HREDRAW/CS_VREDRAW — edit fills the client area
+  wc.style         = 0; // No CS_HREDRAW/CS_VREDRAW - edit fills the client area
   wc.lpfnWndProc   = ResultWindowProc;
   wc.hInstance     = hInstance;
   wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
@@ -99,9 +99,9 @@ HWND GetResultHwnd() {
 }
 
 // Returns the number of digit-width characters that fit in the edit control's
-// usable text area. Reads the edit's own client rect — which the system has
+// usable text area. Reads the edit's own client rect - which the system has
 // already clipped to exclude the WS_EX_CLIENTEDGE border and WS_VSCROLL
-// scrollbar as non-client area — then subtracts the edit's internal text
+// scrollbar as non-client area - then subtracts the edit's internal text
 // margins (EM_GETMARGINS). These margins vary by platform and font and cannot
 // be reliably inferred from system metrics alone. Falls back to kResultWrapWidth
 // if s_result_edit is not yet sized or any query fails.
@@ -125,7 +125,7 @@ static size_t ComputeWrapWidth() {
   }
   const HFONT hFont  = reinterpret_cast<HFONT>(GetStockObject(SYSTEM_FONT));
   const HGDIOBJ hOld = SelectObject(hdc, hFont);
-  // Measure a digit directly — digits are wider than tmAveCharWidth in
+  // Measure a digit directly - digits are wider than tmAveCharWidth in
   // proportional fonts, and the result content is primarily decimal digits.
   SIZE sz       = {};
   const BOOL ok = GetTextExtentPoint32W(hdc, L"0", 1, &sz);
@@ -281,7 +281,7 @@ static LRESULT CALLBACK ResultWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPA
           SendMessageW(hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hSmall));
         }
       }
-      // Load content now while the parent window is not yet visible — Wine
+      // Load content now while the parent window is not yet visible - Wine
       // skips layout/paint for children of unmapped windows, so this is
       // fast even for large files. Post-calc reloads hit ReloadResultWindow
       // directly and rely on WM_SETREDRAW to reduce layout overhead.

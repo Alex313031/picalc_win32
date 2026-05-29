@@ -26,7 +26,7 @@ static FnNtQuerySystemInformation ResolveNtQuery() {
   static FnNtQuerySystemInformation pfn = nullptr;
   static bool s_resolved                = false;
   if (!s_resolved) {
-    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    HMODULE hNtdll = GetModuleHandleW(kNtDll);
     if (hNtdll != nullptr) {
       pfn = reinterpret_cast<FnNtQuerySystemInformation>(
           GetProcAddress(hNtdll, "NtQuerySystemInformation"));
@@ -40,12 +40,12 @@ DWORD GetLogicalProcessorCount() {
   SYSTEM_INFO si = {};
 
   // GetNativeSystemInfo is XP+ only. Resolve it dynamically so the import
-  // table has no entry for it — a missing IAT entry crashes Win2K at load.
+  // table has no entry for it - a missing IAT entry crashes Win2K at load.
   typedef void(WINAPI * FnGetNativeSystemInfo)(LPSYSTEM_INFO);
   static FnGetNativeSystemInfo pfnGetNativeSystemInfo = nullptr;
   static bool s_resolved                              = false;
   if (!s_resolved) {
-    HMODULE hKernel32      = GetModuleHandleW(L"kernel32.dll");
+    HMODULE hKernel32      = GetModuleHandleW(kKernel32Dll);
     pfnGetNativeSystemInfo = reinterpret_cast<FnGetNativeSystemInfo>(
         hKernel32 ? GetProcAddress(hKernel32, "GetNativeSystemInfo") : nullptr);
     s_resolved = true;
@@ -59,7 +59,7 @@ DWORD GetLogicalProcessorCount() {
   return (si.dwNumberOfProcessors > 0) ? si.dwNumberOfProcessors : 1;
 }
 
-// Previous snapshot — zeroed at startup. s_prev_count == 0 means no snapshot
+// Previous snapshot: zeroed at startup. s_prev_count == 0 means no snapshot
 // taken yet; UpdateCpuStats saves the first snapshot and returns false.
 static SysProcPerfInfo s_prev_cpus[256] = {};
 static DWORD s_prev_count               = 0;

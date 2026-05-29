@@ -77,6 +77,16 @@ const std::wstring GetNTVerString();
 // For checking system's commctl32.dll
 bool IsCommCtrlAtLeast(const DWORD to_compare);
 
+// Creates a tooltip window owned by hWndParent and attaches it to hWndControl
+// with TTF_SUBCLASS so hover detection is handled automatically - no manual
+// WM_MOUSEMOVE relaying or TTM_RELAYEVENT plumbing needed. Returns the
+// tooltip HWND on success, or nullptr if any argument is null or the
+// tooltip window can't be created. The tooltip text is captured by pointer
+// (TOOLINFOW::lpszText), so the buffer must remain valid for the tooltip's
+// lifetime - pass a string literal or a long-lived constant.
+HWND AddTooltip(HWND hWndParent, HWND hWndControl,
+                HINSTANCE hInst, const wchar_t* tooltipText = L"Dummy tooltip");
+
 // Gets if a given menu has an item CHECKED or not.
 bool IsMenuChecked(HMENU menu, UINT id);
 

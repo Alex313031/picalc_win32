@@ -145,7 +145,7 @@ bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className) {
   wndclass.hInstance   = hInstance;
   wndclass.hIcon       = kMainIcon;
   wndclass.hCursor     = LoadCursorW(nullptr, IDC_ARROW);
-  // We handle erase + paint ourselves - WM_ERASEBKGND returns TRUE
+  // We handle erase + paint ourselves: WM_ERASEBKGND returns TRUE
   // and WM_PAINT fills with g_bkg_color. Use the system pseudo-brush
   // so the OS updates it automatically on WM_SYSCOLORCHANGE.
   wndclass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_3DFACE + 1);
@@ -508,11 +508,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     }
     case WM_ERASEBKGND: {
       // Two distinct callers reach here:
-      //   1) The OS, as part of our own paint cycle. WindowFromDC(hdc) == hWnd.
-      //      We defer to WM_PAINT, which composites into a backbuffer — return
+      //   1. The OS, as part of our own paint cycle. WindowFromDC(hdc) == hWnd.
+      //      We defer to WM_PAINT, which composites into a backbuffer - return
       //      TRUE to suppress the default erase (and the grey flash that comes
       //      with it).
-      //   2) DrawThemeParentBackground from a child (typically the themed
+      //   2. DrawThemeParentBackground from a child (typically the themed
       //      groupbox), forwarding WM_ERASEBKGND with the child's own DC.
       //      WindowFromDC returns the child HWND. We paint the parent bg into
       //      that DC so the child sees the right backdrop.
@@ -688,7 +688,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDC_EXIT_BUTTON:
           SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDM_CEXIT, 0), 0);
           break;
-        case IDC_OPENOUT_BUTTON:
+        case IDC_RESULT:
           ToggleResultWindow(hWnd);
           break;
         case IDC_CLEARRESULT_BUTTON:
@@ -715,7 +715,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               ErrorBox(hWnd, L"Results File Error", L"Failed to clear results file.");
             } else {
               ReloadResultWindow();
-              LOG(INFO) << L"Cleared result file " << kResultsFile;
             }
           }
           break;
