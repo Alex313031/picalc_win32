@@ -1,10 +1,12 @@
 # Copyright 2026 Alex313031
 
+declare_args() {
+  use_gmp_dll = false
+}
+
 executable("picalc_win32") {
   configs += [
     ":picalc_win32_config",
-    "./src/logging:pilogger_config",
-    "//src/gmp-ninja:gmp_public_config",
   ]
   precompiled_header = "src/framework.h"
   precompiled_source = "src/pch.cc"
@@ -34,17 +36,24 @@ executable("picalc_win32") {
     "src/utils.h",
     "src/version.h",
   ]
-  public_deps = [
-    "//src/gmp-ninja:gmp_static",
-  ]
-  deps = [
-    "src/logging:pilogger",
-    "//src/gmp-ninja:libgmpxx_static",
-  ]
+
+  public_deps = []
+  deps = [ "src/logging:pilogger", ]
+  if (use_gmp_dll) {
+    public_deps += [ "//src/gmp-ninja:gmp_shared", ]
+    deps += [ "//src/gmp-ninja:libgmp", ]
+  } else {
+    public_deps += [ "//src/gmp-ninja:gmp_static", ]
+    deps += [ "//src/gmp-ninja:libgmp_static", ]
+  }
   output_name = "picalc"
 }
 
 config("picalc_win32_config") {
+  configs = [
+    "./src/logging:pilogger_config",
+    "//src/gmp-ninja:gmp_public_config",
+  ]
   defines = []
   cflags = []
   include_dirs = [ "./src", ]
