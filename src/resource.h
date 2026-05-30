@@ -34,11 +34,6 @@
 #define IDM_CLEARLOG                253 // Clears the log file
 #define IDM_OPENLOG                 254 // Opens log file with notepad
 
-// Embedded background sound WAV files
-#define IDR_TADA_WAV                500 // "Tada" sound when calculation complete
-#define IDR_OHNO_WAV                501 // "Oh No!" sound from ImgBurn, when calculation fails or is interrupted
-#define IDR_NOTIFY_WAV              502 // Win2K ding sound, used for about dialog notify sound
-
 /* Child control IDs */
 #define IDC_OUTPUT_EDIT             600 // Output status pane
 #define IDC_SPLITTER                601 // Splitter bar
@@ -73,7 +68,13 @@
 #define IDC_MEM_GROUP               629 // Memory metrics sub-groupbox
 
 // Timer
-#define WM_MONTIMER                 400 // For system monitor ticks
+#define IDT_MONTIMER                400 // For system monitor ticks
+#define IDT_WRAPTIMER               401 // For "word wrap" of results window
+
+// Embedded background sound WAV files
+#define IDR_TADA_WAV                500 // "Tada" sound when calculation complete
+#define IDR_OHNO_WAV                501 // "Oh No!" sound from ImgBurn, when calculation fails or is interrupted
+#define IDR_NOTIFY_WAV              502 // Win2K ding sound, used for about dialog notify sound
 
 // For resources to be loaded without an ID from the system.
 #ifndef IDC_STATIC

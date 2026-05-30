@@ -13,6 +13,10 @@ extern const wchar_t kCalculateMessage[];
 extern const wchar_t kStoppedMessage[];
 extern const wchar_t kDoneMessage[];
 extern const wchar_t kIterMessage[];
+extern const wchar_t kFormattingMsg[];
+extern const wchar_t kWriteResultMsg[];
+extern const wchar_t kResultGood[];
+extern const wchar_t kResultBad[];
 
 // Controls strings
 extern const wchar_t kNumDigitsLabel[];

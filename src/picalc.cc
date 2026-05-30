@@ -48,7 +48,8 @@ namespace {
   constexpr long kChudA   = 13591409L;
   constexpr long kChudB   = 545140134L;
   constexpr long kChudC   = 640320L;
-  constexpr long kPiCoeff = 426880L; // pi = kPiCoeff * sqrt(10005) * Q / T
+  constexpr long kPiCoeff = 426880L; // pi = kPiCoeff * sqrt(kSqrtRad) * Q / T
+  constexpr long kSqrtRad = 10005L;
 
   // Decimal digits gained per Chudnovsky term. Used to size N from a
   // user-requested digit count.
@@ -74,7 +75,7 @@ namespace {
   // calculations and closed on the next StartCalculation.
   HANDLE g_calc_thread = nullptr;
 
-  // sqrt(10005) needed for the final closed-form pi formula. Runs on
+  // sqrt(kSqrtRad) needed for the final closed-form pi formula. Runs on
   // its own worker so it can overlap with the BS instead of adding to
   // the post-BS critical path.
   struct SqrtArgs {
@@ -83,11 +84,11 @@ namespace {
 
   DWORD WINAPI SqrtWorker(LPVOID thread_param) {
     SqrtArgs* args = static_cast<SqrtArgs*>(thread_param);
-    mpf_sqrt_ui(args->sqrt_result.get_mpf_t(), 10005);
+    mpf_sqrt_ui(args->sqrt_result.get_mpf_t(), kSqrtRad);
     return 0;
   }
 
-  // Background sqrt(10005) worker and its heap-allocated argument block.
+  // Background sqrt(kSqrtRad) worker and its heap-allocated argument block.
   // Heap allocation lets CalcThreadProc bail on stop without waiting for
   // the sqrt to finish - StartCalculation joins and frees it before the
   // next precision change so two sqrt workers never overlap.
@@ -128,9 +129,8 @@ namespace {
   constexpr int kMaxMergeLevels = 33;
   std::atomic<int> g_combines_at_level[kMaxMergeLevels];
   std::atomic<DWORD> g_level_start_tick[kMaxMergeLevels]; // tick when first combine at level fires
-  int g_start_depth       = 0;                            // Set once per calc
-  int g_total_depth       = 0;                            // g_start_depth + 1
-  DWORD g_calc_start_tick = 0;                            // Captured by CalcThreadProc
+  int g_start_depth = 0;                                  // Set once per calc
+  int g_total_depth = 0;                                  // g_start_depth + 1
 
   void ResetMergeProgress(int start_depth) {
     g_start_depth = start_depth;
@@ -160,7 +160,7 @@ namespace {
           GetTickCount() - g_level_start_tick[depth].load(std::memory_order_acquire);
       std::wostringstream line;
       line << L"Merge level " << depth << L" of " << g_total_depth << L" done (" << expected
-           << L" mpf combines, " << (level_ms / 1000.0) << L"s.)";
+           << L" mpf combines, " << (level_ms / kMsMul) << L"s.)";
       EmitLine(line.str(), false);
     }
   }
@@ -201,7 +201,7 @@ namespace {
     if (StopRequested()) {
       return;
     }
-    constexpr size_t kParallelMulThresholdLimbs = 8000; // ~64KB at 8B/limb
+    constexpr size_t kParallelMulThresholdLimbs = 8000u; // ~64KB at 8B/limb
     const bool parallelize = mpz_size(left_pqt.P.get_mpz_t()) > kParallelMulThresholdLimbs ||
                              mpz_size(left_pqt.T.get_mpz_t()) > kParallelMulThresholdLimbs;
     if (!parallelize) {
@@ -345,6 +345,16 @@ namespace {
     return ToWide(formatted);
   }
 
+  bool SanityCheckResult(const std::wstring& picheck) {
+    wchar_t* endptr;
+    const long double to_check = std::wcstold(picheck.data(), &endptr);
+    if (endptr == picheck.data()) {
+      LOG(DEBUG) << L"Sanity check could not parse: " << picheck;
+      return false;
+    }
+    return std::fabs(to_check - dPiCompare) < 1e-13L;
+  }
+
   // =========================================================================
   // Orchestrator
   // =========================================================================
@@ -355,7 +365,10 @@ namespace {
     int threads      = outer->threads;
     delete outer;
 
-    OpenResultFile();
+    if (!OpenResultFile()) {
+      LOG(ERROR) << L"Could not open results file!";
+      return 1;
+    }
     // Capture the file position before writing anything for this run so we
     // can roll back cleanly if the calculation is stopped mid-way.
     const LONGLONG run_start_pos = GetResultFilePosition();
@@ -378,15 +391,14 @@ namespace {
            << L")";
     EmitLine(banner.str(), false);
     WriteLineToResultFile(banner.str());
-
-    const DWORD t_start = GetTickCount();
-    g_calc_start_tick   = t_start;
+    // Mark start of calculation
+    const DWORD t_calc_start = GetTickCount();
 
     // GMP precision: digits * log2(10) + guard bits.
     const long long prec_bits = static_cast<long>(digits * 3.4) + 64;
-    mpf_set_default_prec(prec_bits);
+    mpf_set_default_prec(prec_bits); // Sets GMP's internal precision
 
-    // Kick off sqrt(10005) on its own worker. It needs the default mpf
+    // Kick off sqrt(kSqrtRad) on its own worker. It needs the default mpf
     // precision we just set; by the time BS finishes the sqrt is
     // typically done too, so its 5-10s falls out of the post-BS critical
     // path. Heap-allocated so CalcThreadProc can bail on stop without
@@ -438,20 +450,20 @@ namespace {
       const DWORD sqrt_wait_ms = GetTickCount() - t_bs_end;
       if (sqrt_wait_ms > 0) {
         std::wostringstream line;
-        line << L"Parallel sqrt: " << (sqrt_wait_ms / 1000.0) << L"s.";
+        line << L"Parallel sqrt: " << (sqrt_wait_ms / kMsMul) << L"s.";
         EmitLine(line.str(), false);
       }
     } else {
       // CreateThread failed - run sqrt inline and log it as a stage.
       const DWORD sq_start = GetTickCount();
-      mpf_sqrt_ui(g_sqrt_args->sqrt_result.get_mpf_t(), 10005);
+      mpf_sqrt_ui(g_sqrt_args->sqrt_result.get_mpf_t(), kSqrtRad);
       std::wostringstream line;
-      line << L"sqrt(10005): " << ((GetTickCount() - sq_start) / 1000.0) << L"s.";
+      line << L"Single sqrt: " << ((GetTickCount() - sq_start) / kMsMul) << L"s.";
       EmitLine(line.str(), false);
     }
 
-    // pi = kPiCoeff * sqrt(10005) * Q / T  (constants derived from
-    // factoring 640320^(3/2) = 640320 * 8 * sqrt(10005)). The mpf_div
+    // pi = kPiCoeff * sqrt(kSqrtRad) * Q / T  (constants derived from
+    // factoring 640320^(3/2) = 640320 * 8 * sqrt(kSqrtRad)). The mpf_div
     // here is single-threaded and ~3-5x the cost of one mpf_mul on
     // huge precision; broken out with a timing line so the user knows
     // the calc is in the divide phase, not stuck.
@@ -459,19 +471,18 @@ namespace {
     const mpf_class q_f(total.Q);
     const mpf_class t_f(total.T);
     const mpf_class pi = (g_sqrt_args->sqrt_result * q_f * kPiCoeff) / t_f;
-    {
-      const DWORD elapsed = GetTickCount() - mpf_start;
-      std::wostringstream line;
-      line << L"Merge level " << g_total_depth << L" of " << g_total_depth
-           << L" done (1 mpf divide, " << (elapsed / 1000.0) << L"s.)";
-      EmitLine(line.str(), false);
-      WriteLineToResultFile(line.str());
-    }
-    // Capture t_end immediately after the pi value is computed, before any
+    // Capture t_calc_end immediately after the pi value is computed, before any
     // EmitLine calls (which cross thread boundaries and add UI latency).
     // This makes the total time a clean sum of the logged stages.
-    const DWORD t_end     = GetTickCount();
-    const DWORD elapsedMs = t_end - t_start;
+    const DWORD t_calc_end  = GetTickCount();
+    const DWORD mpf_elapsed = t_calc_end - mpf_start;
+    std::wostringstream line;
+    line << L"Merge level " << g_total_depth << L" of " << g_total_depth << L" done (1 mpf divide, "
+         << (mpf_elapsed / kMsMul) << L"s.)";
+    EmitLine(line.str(), false);
+    WriteLineToResultFile(line.str());
+    // Total elapsed calculation time
+    const DWORD t_elapsed_calc_ms = t_calc_end - t_calc_start;
 
     if (StopRequested()) {
       TruncateResultFileTo(run_start_pos);
@@ -481,29 +492,49 @@ namespace {
       g_running.store(false);
       return 0;
     }
-
+    // Log iterations
     std::wostringstream iter_line;
     iter_line << kIterMessage << num_terms;
     EmitLine(iter_line.str(), false);
     WriteLineToResultFile(iter_line.str());
-    std::wostringstream time_line;
-    time_line << kDoneMessage << (elapsedMs / 1000.0) << L" seconds elapsed.";
-    EmitLine(time_line.str(), false);
-    WriteLineToResultFile(time_line.str());
+    // Log calculation time
+    std::wostringstream calc_time_msg;
+    calc_time_msg << kDoneMessage << (t_elapsed_calc_ms / kMsMul) << L" seconds.";
+    EmitLine(calc_time_msg.str(), false);
+    WriteLineToResultFile(calc_time_msg.str());
     // Result, iterations (= BS leaves used), and elapsed time.
     // The UI caps display at kMaxPrintNumDigits - FormatPi only converts
     // that many digits so the cheap path stays cheap. The file always
     // gets the full conversion; for large digit counts that is the second
     // single-threaded GMP hotspot (after mpf_div above), hence the
     // timing line.
-    EmitLine(L"Formatting result to decimal...", false);
-    const std::wstring outpi      = FormatPi(pi, digits, kMaxPrintNumDigits);
-    const std::wstring outpi_full = FormatPi(pi, digits, digits);
+    EmitLine(kFormattingMsg, false);
+    const DWORD t_format_out_start   = GetTickCount(); // Starting short format
+    const std::wstring output_pi     = FormatPi(pi, digits, kMaxPrintNumDigits);
+    const DWORD t_format_out_elapsed = GetTickCount() - t_format_out_start; // End short format
+    LOG(DEBUG) << L"Short FormatPi took " << (t_format_out_elapsed / kMsMul) << L"s.";
+    const DWORD t_format_result_start   = GetTickCount(); // Starting long format
+    const std::wstring result_pi_full   = FormatPi(pi, digits, digits);
+    const DWORD t_format_result_elapsed = GetTickCount() - t_format_result_start;
+    LOG(DEBUG) << L"Long FormatPi took " << (t_format_result_elapsed / kMsMul) << L"s.";
+    const DWORD t_elapsed_format_ms = t_format_out_elapsed + t_format_result_elapsed;
+    std::wostringstream fmt_line;
+    fmt_line << L"Formatting took " << (t_elapsed_format_ms / kMsMul) << L"s.";
+    EmitLine(fmt_line.str(), false);
     // Emit truncated Pi to the output area / console.
-    EmitLine(std::wstring(L"Result: ") + outpi, false);
+    if (SanityCheckResult(output_pi)) {
+      EmitLine(kResultGood + output_pi, false);
+    } else {
+      EmitLine(kResultBad + output_pi, true);
+      std::wostringstream bad_calc_msg;
+      bad_calc_msg << L"output_pi did not match " << std::setprecision(16) << dPiCompare;
+      LOG(ERROR) << bad_calc_msg.str();
+      ErrorBox(mainHwnd, kResultBad, bad_calc_msg.str());
+      return 1;
+    }
     // Write full untruncated Pi to the results file.
-    LOG(DEBUG) << L"Writing results to " << kResultsFile;
-    WriteLineToResultFile(std::wstring(L"Result: ") + outpi_full);
+    LOG(DEBUG) << kWriteResultMsg << kResultsFile;
+    WriteLineToResultFile(std::wstring(L"Result: ") + result_pi_full);
     // Flush after the potentially huge pi result
     const bool done = FlushResultFile();
     // Notify the UI thread to refresh the result viewer. PostMessageW is used
@@ -536,11 +567,17 @@ namespace {
 // =========================================================================
 
 bool StartCalculation(int digits, int threads) {
-  if (g_running.load()) {
+  if (g_running) {
+    SendOutputMessage(L"Already running.");
+    LOG(DEBUG) << L"Already running!";
     return false;
   }
-  if (digits <= 0 || threads <= 0) {
-    SendOutputMessage(L"Invalid digits/threads selection.");
+  if (digits <= 0 || digits > static_cast<int>(kMaxNumDigits)) {
+    EmitLine(L"Invalid number of digits!", true);
+    return false;
+  }
+  if (threads <= 0 || threads > static_cast<int>(kMaxNumThreads)) {
+    EmitLine(L"Invalid number of threads!", true);
     return false;
   }
   if (static_cast<unsigned>(digits) < kMinNumDigits) {
@@ -559,6 +596,7 @@ bool StartCalculation(int digits, int threads) {
   if (g_calc_thread != nullptr) {
     CloseHandle(g_calc_thread);
     g_calc_thread = nullptr;
+    CLOG(DEBUG) << L"Cleaned up previous calculation thread";
   }
   // If the previous run was stopped, its sqrt worker may still be running.
   // Join it now before changing the global GMP precision.
@@ -568,6 +606,7 @@ bool StartCalculation(int digits, int threads) {
     g_sqrt_thread = nullptr;
     delete g_sqrt_args;
     g_sqrt_args = nullptr;
+    CLOG(DEBUG) << L"Cleaned up previous square root thread";
   }
   g_stop_requested.store(false);
   g_running.store(true);
@@ -578,14 +617,16 @@ bool StartCalculation(int digits, int threads) {
   if (g_calc_thread == nullptr) {
     delete args;
     g_running.store(false);
+    EmitLine(L"Failed to start calculation thread!", true);
     return false;
   }
   return true;
 }
 
-void StopCalculation() {
+bool StopCalculation() {
   if (!g_running) {
-    return;
+    return false;
   }
   g_stop_requested.store(true);
+  return true;
 }

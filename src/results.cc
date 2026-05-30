@@ -6,6 +6,7 @@
 #include "results.h"
 
 #include "globals.h"
+#include "resource.h"
 #include "strings.h"
 #include "utils.h"
 
@@ -298,14 +299,14 @@ static LRESULT CALLBACK ResultWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPA
       if (s_result_edit != nullptr) {
         MoveWindow(s_result_edit, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
         // Debounce re-wrap: reset the timer on every resize event so we only
-        // re-pre-wrap once, 100 ms after the user stops dragging the border.
-        KillTimer(hWnd, 1);
-        SetTimer(hWnd, 1, 100, nullptr);
+        // re-pre-wrap once, kResultWrapTimerMs ms after the user stops dragging the border.
+        KillTimer(hWnd, IDT_WRAPTIMER);
+        SetTimer(hWnd, IDT_WRAPTIMER, static_cast<UINT>(std::round(kResultWrapTimerMs)), nullptr);
       }
       return 0;
     case WM_TIMER:
-      if (wParam == 1) {
-        KillTimer(hWnd, 1);
+      if (wParam == IDT_WRAPTIMER) {
+        KillTimer(hWnd, IDT_WRAPTIMER);
         const size_t new_width = ComputeWrapWidth();
         if (new_width != s_wrap_width && !s_raw_content.empty()) {
           // Scale the first visible line to approximate the same position in
@@ -348,7 +349,7 @@ static LRESULT CALLBACK ResultWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPA
       CloseResultWindow();
       return 0;
     case WM_DESTROY:
-      KillTimer(hWnd, 1);
+      KillTimer(hWnd, IDT_WRAPTIMER);
       s_result_hwnd = nullptr;
       s_result_edit = nullptr;
       s_raw_content.clear();

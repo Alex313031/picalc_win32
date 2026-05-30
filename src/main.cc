@@ -228,7 +228,7 @@ static bool ParseCommandLine(int argc, LPWSTR argv[]) {
 // exit code. `system("pause")` keeps the window open when launched from
 // Explorer so the user can actually read the line.
 static int ShowVersionAndExit() {
-  std::wcout << GetAppName() << GetVersionString() << std::endl;
+  std::wcout << L"\n " << GetAppName() << L" Version " << GetVersionString() << L"\n " << std::endl;
   system("pause");
   return 0;
 }
@@ -295,6 +295,17 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
                       int iCmdShow) {
   UNREFERENCED_PARAMETER(hPrevInstance);
   g_hInstance = hInstance;
+
+  // Raise the process priority class so the calculation worker threads and
+  // the sysmon timer tick win scheduler quanta against other normal-priority
+  // user processes. Threads inherit the elevated base priority, so we don't
+  // have to touch each one individually. ABOVE_NORMAL keeps the UI input
+  // queue responsive even when the calc is pinning every core - HIGH starves
+  // foreground GUI threads of other apps and REALTIME starves the system
+  // (audio glitches, mouse lag). No special privilege is required for
+  // ABOVE_NORMAL, so this should always succeed; ignore the return.
+  SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+
   // Initialize common controls
   INITCOMMONCONTROLSEX icex;
   icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -403,7 +414,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
         (result_hwnd != nullptr) && (msg.hwnd == result_hwnd || IsChild(result_hwnd, msg.hwnd));
     if (for_result) {
       // Escape closes the viewer; all other keys dispatch normally.
-      if (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE) {
+      if (msg.message == WM_KEYDOWN && (msg.wParam == VK_ESCAPE || msg.wParam == 'R')) {
         CloseResultWindow();
         continue;
       }
@@ -501,7 +512,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       SetFocus(hStartButton);
       break;
     case WM_TIMER: {
-      if (wParam == WM_MONTIMER) {
+      if (wParam == IDT_MONTIMER) {
         OnSysmonTick(hWnd);
       }
       break;
@@ -673,9 +684,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                     L"Please select a digit and thread count before calculating.");
             break;
           }
-          if (!StartCalculation(digits, threads)) {
-            SendOutputMessage(L"Could not start (already running?).");
-          }
+          StartCalculation(digits, threads);
           break;
         }
         case IDC_DIGITS_COMBO:
@@ -697,15 +706,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDC_CLEAROUTPUT_BUTTON:
           SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDC_CLEAROUTPUT, 0), 0);
           break;
-        case IDC_STOP_BUTTON:
-          if (!g_running.load()) {
-            EmitLine(L"No Pi threads running", false);
-          }
-          StopCalculation();
-          if (g_sound_on) {
+        case IDC_STOP_BUTTON: {
+          // StopCalculation does the atomic g_running check internally and
+          // returns true iff it actually requested a stop. Branching on its
+          // return (instead of re-reading g_running here first) collapses
+          // the two reads into one and removes the race where a worker
+          // could finish naturally between the check and the call.
+          const bool stopped = StopCalculation();
+          if (!stopped) {
+            EmitLine(L"No Pi threads running.", false);
+          } else if (g_sound_on) {
             PlayWav(IDR_OHNO_WAV);
           }
-          break;
+        } break;
         case IDM_HELP:
           LaunchHelp(hWnd);
           break;
@@ -756,7 +769,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // CHECKED == Sounds on. Push into the global so picalc's
           // completion-chime check sees the new state.
           g_sound_on = ToggleMenuCheck(hWnd, IDM_SOUND);
-          // LOG(INFO) << L"Toggled sound " << g_sound_on ? L"on" : L"off";
+          LOG(INFO) << L"Toggled sound " << (g_sound_on ? L"on" : L"off");
           break;
         }
         case IDM_COLOREDOUTPUT: {
@@ -764,7 +777,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Force the output edit to repaint immediately.
           if (hOutputEdit != nullptr) {
             InvalidateRect(hOutputEdit, nullptr, TRUE);
-            // LOG(INFO) << L"Colored status pane " << g_colored_output ? L"on" : L"off";
+            LOG(INFO) << L"Colored status pane turned " << (g_colored_output ? L"on" : L"off");
           } else {
             LOG(ERROR) << L"No edit control to color!";
           }
@@ -792,14 +805,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (s_console_hidden) {
             if (logging::ShowConsole(false)) { // false = don't steal focus
               s_console_hidden = false;
-              LOG(DEBUG) << L"Showed console.";
+              LOG(INFO) << L"Showed console.";
             } else {
               LOG(ERROR) << L"Failed to show console!";
             }
           } else {
             if (logging::HideConsole()) {
               s_console_hidden = true;
-              LOG(DEBUG) << L"Hid console.";
+              LOG(INFO) << L"Hid console.";
             } else {
               LOG(ERROR) << L"Failed to hide console!";
             }

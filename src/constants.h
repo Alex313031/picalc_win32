@@ -68,9 +68,8 @@ inline constexpr COLORREF kSplitterHandleColor = RGB_DKGREY;
 inline constexpr float kTopPaneFraction = 1.0f / 2.0f;
 
 // Top-pane control layout (in pixels, relative to the parent client area).
-inline constexpr INT kGroupMargin = 7; // groupbox outer margin: left, right, bottom
-inline constexpr INT kGroupOuterTop =
-    10; // groupbox outer margin: top (distance from client top to frame line)
+inline constexpr INT kGroupMargin   = 7;  // groupbox outer margin: left, right, bottom
+inline constexpr INT kGroupOuterTop = 10; // groupbox outer top margin: (client top to frame line)
 inline constexpr INT kGroupInnerPad = 10; // inner padding: frame line -> first control row
 inline constexpr INT kPadLeft       = 14;
 inline constexpr INT kPadTop        = 14;
@@ -131,11 +130,15 @@ inline constexpr UINT kMinNumDigits = 1u;         // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 
 // Max digits shown in the output pane; anything beyond this is truncated and
-// the full result is written to the result file only.
-inline constexpr UINT kMaxPrintNumDigits = 32;
+// the full result is written to the result file only. Also caps the length
+// of the prefix that SanityCheckResult parses into a long double - keep at
+// or below long double's reliable decimal precision (~15 on 64-bit, ~18 on
+// x87 80-bit) or the equality check will fail spuriously.
+inline constexpr UINT kMaxPrintNumDigits = 15u;
+inline constexpr long double dPiCompare  = 3.1415926535897932L; // 16 digits long, 1 more than above
 
 // Maximum bytes that can be loaded into an edit control
-inline constexpr size_t kMaxEditLoadBytes = static_cast<size_t>(50u * 1024u * 1024u); // 50 MB
+inline constexpr size_t kMaxEditLoadBytes = static_cast<size_t>(101u * 1024u * 1024u); // 101 MB
 
 inline constexpr UINT kMinNumThreads = 1u;   // Need at least 1 thread
 inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than this
@@ -164,5 +167,9 @@ inline constexpr unsigned long kHighSpeed = 500UL;
 inline constexpr ULONGLONG kGB = 1024ULL * 1024ULL * 1024ULL;
 inline constexpr ULONGLONG kMB = 1024ULL * 1024ULL;
 inline constexpr ULONGLONG kKB = 1024ULL;
+
+// Time multipliers
+inline constexpr double kMsMul            = 1000.0;
+inline constexpr float kResultWrapTimerMs = 16.66667f; // ~60 FPS
 
 #endif // PICALCWIN32_CONSTANTS_H_

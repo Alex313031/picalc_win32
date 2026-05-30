@@ -468,13 +468,13 @@ bool StartSysmon(HWND hWnd, UINT interval_ms) {
   // Seed the first CPU snapshot so the next tick has a delta immediately.
   CpuStats dummy = {};
   UpdateCpuStats(&dummy);
-  KillTimer(hWnd, WM_MONTIMER);
-  return SetTimer(hWnd, WM_MONTIMER, interval_ms, nullptr) != 0;
+  KillTimer(hWnd, IDT_MONTIMER);
+  return SetTimer(hWnd, IDT_MONTIMER, interval_ms, nullptr) != 0;
 }
 
 void StopSysmon(HWND hWnd) {
   if (hWnd != nullptr) {
-    KillTimer(hWnd, WM_MONTIMER);
+    KillTimer(hWnd, IDT_MONTIMER);
   }
 }
 

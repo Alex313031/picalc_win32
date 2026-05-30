@@ -36,15 +36,15 @@ HWND GetGraphHwnd();
 HDWP LayoutSysmonMetrics(HDWP hdwp, int x, int y, int w, int h);
 
 // Starts (or restarts) the system monitor timer on hWnd with the given
-// interval in milliseconds. Uses WM_MONTIMER as the nIDEvent so WM_TIMER
-// handlers can identify sysmon ticks by wParam == WM_MONTIMER.
+// interval in milliseconds. Uses IDT_MONTIMER as the nIDEvent so WM_TIMER
+// handlers can identify sysmon ticks by wParam == IDT_MONTIMER.
 // Also takes the first CPU/mem snapshot so the first tick has a valid delta.
 bool StartSysmon(HWND hWnd, UINT interval_ms);
 
 // Stops the sysmon timer. Safe to call even if the timer was never started.
 void StopSysmon(HWND hWnd);
 
-// Must be called from the WM_TIMER handler when wParam == WM_MONTIMER.
+// Must be called from the WM_TIMER handler when wParam == IDT_MONTIMER.
 // Queries CPU/mem stats and updates all metric value label controls.
 void OnSysmonTick(HWND hWnd);
 

@@ -13,8 +13,12 @@
 // Strings to print
 const wchar_t kCalculateMessage[] = L"Started calculating ";
 const wchar_t kStoppedMessage[]   = L"Stopped calculating ";
-const wchar_t kDoneMessage[]      = L"Done! ";
+const wchar_t kDoneMessage[]      = L"Done calculating Pi in ";
 const wchar_t kIterMessage[]      = L"Num. Iterations: ";
+const wchar_t kFormattingMsg[]    = L"Formatting result to decimal...";
+const wchar_t kWriteResultMsg[]   = L"Writing results to ";
+const wchar_t kResultGood[]       = L"Result OK! ";
+const wchar_t kResultBad[]        = L"Result is not correct! ";
 // Controls strings
 const wchar_t kNumDigitsLabel[]   = L"Number of Digits:";
 const wchar_t kNumThreadsLabel[]  = L"Num. CPU Threads:";

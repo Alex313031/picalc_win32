@@ -28,7 +28,8 @@
 // C++ STL Headers
 #include <algorithm> // std::min / std::max
 #include <atomic>    // std::atomic bool
-#include <cmath>     // std::cos / std::sin / std::lround
+#include <cmath>     // std::round / std::lround
+#include <iomanip>   // std::setprecision
 #include <iostream>  // Console output and ostringstream
 #include <limits>    // Numeric limits
 #include <random>    // Randomization functions

@@ -27,6 +27,6 @@ bool StartCalculation(int digits, int threads);
 // has to finish whatever mpz multiply it's currently inside before
 // the next g_stop_requested poll, so there can be a delay between
 // click and "Stopped Calculating ..." landing in the output.
-void StopCalculation();
+bool StopCalculation();
 
 #endif // PICALCWIN32_PICALC_H_
