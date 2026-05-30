@@ -179,9 +179,13 @@ void ReloadResultWindow() {
   SetWindowTextW(s_result_edit, display.empty() ? L"(No results yet)" : display.c_str());
   SendMessageW(s_result_edit, WM_SETREDRAW, TRUE, 0);
   InvalidateRect(s_result_edit, nullptr, TRUE);
-  // Place cursor at the beginning so the file opens at the top.
-  SendMessageW(s_result_edit, EM_SETSEL, 0, 0);
-  SendMessageW(s_result_edit, EM_SCROLLCARET, 0, 0);
+  // Don't pin the caret with EM_SETSEL/EM_SCROLLCARET here. SetWindowText
+  // already resets the view to the top of the document; an explicit caret
+  // anchor makes the edit re-scroll-to-caret on focus events (clicking the
+  // scrollbar arrow briefly steals focus, triggering the snap), which the
+  // user experiences as the scrollbar springing back to the top whenever
+  // they try to scroll away. Notepad doesn't anchor the caret either - it
+  // lets the natural top-of-document state stand and leaves the caret alone.
 }
 
 void CloseResultWindow() {
