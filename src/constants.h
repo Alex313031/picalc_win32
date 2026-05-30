@@ -135,7 +135,7 @@ inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
 // or below long double's reliable decimal precision (~15 on 64-bit, ~18 on
 // x87 80-bit) or the equality check will fail spuriously.
 inline constexpr UINT kMaxPrintNumDigits = 15u;
-inline constexpr long double dPiCompare  = 3.1415926535897932L; // 16 digits long, 1 more than above
+inline constexpr long double dPiCompare  = 3.141592653589793L;
 
 // Maximum bytes that can be loaded into an edit control
 inline constexpr size_t kMaxEditLoadBytes = static_cast<size_t>(101u * 1024u * 1024u); // 101 MB
@@ -147,6 +147,10 @@ inline constexpr UINT kMaxNumThreads = 256u; // No consumer CPUs have more than 
 // Posted (never sent) from worker threads to mainHwnd so the UI thread
 // performs the actual window update, avoiding cross-thread SendMessage hangs.
 inline constexpr UINT WM_PICALC_RELOAD_RESULTS = WM_APP + 1;
+// Posted once from wWinMain right before the main GetMessage loop, so the
+// handler fires after every synchronous startup message (WM_CREATE / WM_SIZE
+// / WM_PAINT) has drained. WindowProc logs total elapsed startup time.
+inline constexpr UINT WM_PICALC_STARTUP_COMPLETE = WM_APP + 2;
 
 // Child window style
 inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
@@ -170,6 +174,6 @@ inline constexpr ULONGLONG kKB = 1024ULL;
 
 // Time multipliers
 inline constexpr double kMsMul            = 1000.0;
-inline constexpr float kResultWrapTimerMs = 16.66667f; // ~60 FPS
+inline constexpr float kResultWrapTimerMs = 33.33334; // ~30 FPS
 
 #endif // PICALCWIN32_CONSTANTS_H_

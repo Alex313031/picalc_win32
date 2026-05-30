@@ -402,6 +402,12 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 5;
   }
 
+  // Post the startup-complete marker last so it lands at the tail of the
+  // queue. By the time WindowProc pulls it, every synchronous init message
+  // (WM_CREATE / WM_SIZE / WM_PAINT from CreateWindow / ShowWindow /
+  // UpdateWindow) has drained and the pump is in steady state.
+  PostMessageW(mainHwnd, WM_PICALC_STARTUP_COMPLETE, 0, 0);
+
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0)) {
     // Check whether this message is destined for the result viewer or one
@@ -491,7 +497,7 @@ static void ApplyMenuDefaults(HWND hWnd) {
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
   switch (message) {
-    case WM_CREATE:
+    case WM_CREATE: {
       if (mainHwnd == nullptr) {
         mainHwnd = hWnd; // Prevent race condition in InitApp
       }
@@ -510,7 +516,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       }
       InitApp(hWnd);
       SetFocus(hStartButton);
-      break;
+    } break;
     case WM_TIMER: {
       if (wParam == IDT_MONTIMER) {
         OnSysmonTick(hWnd);
@@ -868,6 +874,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // Posted by the calc worker thread on completion, and by
       // ToggleResultWindow on open. Kicks off the async file load.
       ReloadResultWindow();
+      return 0;
+    case WM_PICALC_STARTUP_COMPLETE:
+      // Posted once at the tail of the startup message queue by wWinMain.
+      // By the time we get here every synchronous init message has been
+      // dispatched, so this is the earliest "fully running" moment.
+      LOG(INFO) << L"Startup complete in " << MsSinceProcessStart() << L"ms";
       return 0;
     default:
       return DefWindowProcW(hWnd, message, wParam, lParam);

@@ -410,6 +410,21 @@ bool IsCommCtrlAtLeast(const DWORD to_compare) {
   return kCommCtrlVer >= to_compare;
 }
 
+DWORD MsSinceProcessStart() {
+  FILETIME create_ft, exit_ft, kernel_ft, user_ft;
+  if (!GetProcessTimes(GetCurrentProcess(), &create_ft, &exit_ft, &kernel_ft, &user_ft)) {
+    return 0;
+  }
+  FILETIME now_ft;
+  GetSystemTimeAsFileTime(&now_ft);
+  const ULONGLONG create_100ns =
+      (static_cast<ULONGLONG>(create_ft.dwHighDateTime) << 32) | create_ft.dwLowDateTime;
+  const ULONGLONG now_100ns =
+      (static_cast<ULONGLONG>(now_ft.dwHighDateTime) << 32) | now_ft.dwLowDateTime;
+  // FILETIME ticks are 100ns; divide by 10,000 to get ms.
+  return static_cast<DWORD>((now_100ns - create_100ns) / 10000ULL);
+}
+
 HWND AddTooltip(HWND hWndParent, HWND hWndControl, HINSTANCE hInst, const wchar_t* tooltipText) {
   if (hWndParent == nullptr || hWndControl == nullptr || tooltipText == nullptr) {
     return nullptr;

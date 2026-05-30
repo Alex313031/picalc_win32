@@ -144,7 +144,11 @@ namespace {
   // Called from BinarySplitParallel after each combine. When the last
   // combine at a given merge level finishes, emits a progress line so
   // the user sees the merge tree climbing toward the root and knows
-  // the calc isn't stuck.
+  // the calc isn't stuck. Each level's "start" timestamp is the previous
+  // level's "end" timestamp (last completion), so a level with only one
+  // combine - notably the root - still reports a meaningful wall time
+  // instead of degenerating to 0. g_level_start_tick[1] is seeded just
+  // before the top-level BinarySplitParallel call in CalcThreadProc.
   void NoteCombineComplete(int depth) {
     // depth < 1 = inside a leaf subtree (too many to log usefully).
     if (depth < 1 || depth >= kMaxMergeLevels) {
@@ -152,16 +156,17 @@ namespace {
     }
     const int count    = g_combines_at_level[depth].fetch_add(1, std::memory_order_relaxed) + 1;
     const int expected = 1 << (g_start_depth - depth);
-    if (count == 1) {
-      g_level_start_tick[depth].store(GetTickCount(), std::memory_order_release);
-    }
     if (count == expected) {
-      const DWORD level_ms =
-          GetTickCount() - g_level_start_tick[depth].load(std::memory_order_acquire);
+      const DWORD now      = GetTickCount();
+      const DWORD level_ms = now - g_level_start_tick[depth].load(std::memory_order_acquire);
       std::wostringstream line;
       line << L"Merge level " << depth << L" of " << g_total_depth << L" done (" << expected
            << L" mpf combines, " << (level_ms / kMsMul) << L"s.)";
       EmitLine(line.str(), false);
+      // Hand the baton: the next level's work begins as this one ends.
+      if (depth + 1 < kMaxMergeLevels) {
+        g_level_start_tick[depth + 1].store(now, std::memory_order_release);
+      }
     }
   }
 
@@ -340,7 +345,7 @@ namespace {
       formatted += raw;
     }
     if (truncated) {
-      formatted += "... (Open result file to see full value)";
+      formatted += "... ";
     }
     return ToWide(formatted);
   }
@@ -352,7 +357,7 @@ namespace {
       LOG(DEBUG) << L"Sanity check could not parse: " << picheck;
       return false;
     }
-    return std::fabs(to_check - dPiCompare) < 1e-13L;
+    return std::fabs(to_check - dPiCompare) < 1e-15L;
   }
 
   // =========================================================================
@@ -426,6 +431,10 @@ namespace {
     ResetMergeProgress(depth);
 
     PQT total;
+    // Seed level 1's start so the first emitted merge line measures from the
+    // actual start of BS work (rather than from the first level-1 combine
+    // completion, which would chop off the entire leaf-subtree phase).
+    g_level_start_tick[1].store(GetTickCount(), std::memory_order_release);
     BinarySplitParallel(0, num_terms, depth, &total);
     const DWORD t_bs_end = GetTickCount();
 
@@ -494,12 +503,12 @@ namespace {
     }
     // Log iterations
     std::wostringstream iter_line;
-    iter_line << kIterMessage << num_terms;
+    iter_line << kIterMessage << FormatThousands(num_terms);
     EmitLine(iter_line.str(), false);
     WriteLineToResultFile(iter_line.str());
     // Log calculation time
     std::wostringstream calc_time_msg;
-    calc_time_msg << kDoneMessage << (t_elapsed_calc_ms / kMsMul) << L" seconds.";
+    calc_time_msg << kDoneCalcMessage << (t_elapsed_calc_ms / kMsMul) << L" seconds.";
     EmitLine(calc_time_msg.str(), false);
     WriteLineToResultFile(calc_time_msg.str());
     // Result, iterations (= BS leaves used), and elapsed time.
@@ -523,24 +532,27 @@ namespace {
     EmitLine(fmt_line.str(), false);
     // Emit truncated Pi to the output area / console.
     if (SanityCheckResult(output_pi)) {
-      EmitLine(kResultGood + output_pi, false);
+      std::wostringstream done_msg;
+      done_msg << kResultOkMsg <<  ((t_elapsed_calc_ms + t_elapsed_format_ms) / kMsMul) << L"s.";
+      EmitLine(done_msg.str(), false);
     } else {
-      EmitLine(kResultBad + output_pi, true);
       std::wostringstream bad_calc_msg;
-      bad_calc_msg << L"output_pi did not match " << std::setprecision(16) << dPiCompare;
-      LOG(ERROR) << bad_calc_msg.str();
-      ErrorBox(mainHwnd, kResultBad, bad_calc_msg.str());
+      bad_calc_msg << kResultBadMsg << output_pi << L"did not match " << std::setprecision(16) << dPiCompare;
+      EmitLine(bad_calc_msg.str(), true);
+      ErrorBox(mainHwnd, kResultBadMsg, bad_calc_msg.str());
       return 1;
     }
     // Write full untruncated Pi to the results file.
     LOG(DEBUG) << kWriteResultMsg << kResultsFile;
-    WriteLineToResultFile(std::wstring(L"Result: ") + result_pi_full);
+
+    WriteLineToResultFile(kResultMsg + result_pi_full);
     // Flush after the potentially huge pi result
     const bool done = FlushResultFile();
     // Notify the UI thread to refresh the result viewer. PostMessageW is used
     // (not SendMessage / direct call) so the worker thread never blocks waiting
     // for the UI thread to process the update, the probable hang root cause on Wine.
     if (done) {
+      EmitLine(kResultMsg + output_pi + kFullResultMsg, false);
       PostMessageW(mainHwnd, WM_PICALC_RELOAD_RESULTS, 0, 0);
     }
 

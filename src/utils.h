@@ -73,6 +73,12 @@ const std::wstring GetNTVerString();
 // For checking system's commctl32.dll
 bool IsCommCtrlAtLeast(const DWORD to_compare);
 
+// Returns milliseconds elapsed since this process was created (as reported
+// by GetProcessTimes). Includes pre-CRT DLL load and static-init time, so
+// it's the closest "from launch" measurement available without an external
+// timer. Returns 0 if the kernel query fails.
+DWORD MsSinceProcessStart();
+
 // Creates a tooltip window owned by hWndParent and attaches it to hWndControl
 // with TTF_SUBCLASS so hover detection is handled automatically - no manual
 // WM_MOUSEMOVE relaying or TTM_RELAYEVENT plumbing needed. Returns the
