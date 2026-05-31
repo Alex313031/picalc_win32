@@ -22,9 +22,9 @@ static bool s_dragging  = false;
 
 // Tracks the last-confirmed selection in each combo so HandleComboBoxes can
 // revert when the user cancels the custom-input dialog. Digits defaults to
-// index 5 ("1M"); threads is set by CreateChildControls based on the actual
+// index 6 ("1M"); threads is set by CreateChildControls based on the actual
 // processor count, possibly injecting a custom value.
-static int s_prev_digits_sel          = 5;
+static int s_prev_digits_sel          = 6;
 static int s_prev_threads_sel         = 0;
 static bool s_digits_custom_injected  = false;
 static bool s_threads_custom_injected = false;
@@ -37,6 +37,7 @@ struct CustomInputParams {
   UINT max_val;
   UINT edit_limit; // max characters the edit control accepts
   UINT result;     // written on IDOK
+  HWND to_focus;   // HWND of control to focus when dialog done.
 };
 
 // Group box that frames the top-pane controls. Sized in LayoutChildren
@@ -334,8 +335,8 @@ bool CreateChildControls(HWND parent) {
   for (const wchar_t* opt : kThreadsOptions) {
     SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
   }
-  // Default digit selection: 1M digits (index 5).
-  SendMessageW(hDigitsCombo, CB_SETCURSEL, 5, 0);
+  // Default digit selection: 1M digits (index 6).
+  SendMessageW(hDigitsCombo, CB_SETCURSEL, 6, 0);
 
   // Default thread selection: exact logical CPU count, clamped to kMaxNumThreads.
   const DWORD cpu_count = std::min(static_cast<DWORD>(kMaxNumThreads), GetLogicalProcessorCount());
@@ -466,15 +467,21 @@ void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     params.min_val    = kMinNumDigits;
     params.max_val    = kMaxNumDigits;
     params.edit_limit = 10; // 1,000,000,000 = 10 digits
+    params.to_focus   = hDigitsCombo;
   } else {
     params.title      = kThreadsDlgTitle;
     params.prompt     = kThreadsDlgPrompt;
     params.min_val    = kMinNumThreads;
     params.max_val    = kMaxNumThreads;
     params.edit_limit = 3; // 256 = 3 digits
+    params.to_focus   = hThreadsCombo;
   }
   const INT_PTR res = DialogBoxParamW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOM_INPUT), hWnd,
                                       CustomInputDlgProc, reinterpret_cast<LPARAM>(&params));
+  // Restore focus to the originating combo box now that the dialog is fully
+  // destroyed - calling SetFocus from inside the dialog proc after EndDialog
+  // would race with the system's own focus restoration during teardown.
+  SetFocus(params.to_focus);
   if (res == IDOK) {
     // Format the validated value and inject it just before "Custom".
     wchar_t val_str[32];

@@ -29,4 +29,7 @@ bool StartCalculation(int digits, int threads);
 // click and "Stopped Calculating ..." landing in the output.
 bool StopCalculation();
 
+// More aggressive than StopCalculation, used at application shutdown.
+void KillCalculation();
+
 #endif // PICALCWIN32_PICALC_H_

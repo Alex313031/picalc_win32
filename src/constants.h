@@ -120,11 +120,11 @@ inline constexpr int kSeparatorWidth     = static_cast<int>(kResultWrapWidth);
 // elements themselves are still pointers to .rdata literals.
 inline const wchar_t* const kDigitOptions[] = {
     // Digit-count options offered in the num digitscombobox.
-    L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"Custom"};
+    L"1", L"10", L"100", L"1K", L"10K", L"100K", L"1M", L"10M", L"50M", L"100M", L"Custom"};
 
 inline const wchar_t* const kThreadsOptions[] = {
     // Threads options offered in the num cpu threads combobox.
-    L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"Custom"};
+    L"1", L"2", L"4", L"6", L"8", L"16", L"32", L"64", L"Custom"};
 
 inline constexpr UINT kMinNumDigits = 1u;         // Min would be 3
 inline constexpr UINT kMaxNumDigits = 1000000000; // 1 Billion max digits cap
@@ -175,5 +175,8 @@ inline constexpr ULONGLONG kKB = 1024ULL;
 // Time multipliers
 inline constexpr double kMsMul            = 1000.0;
 inline constexpr float kResultWrapTimerMs = 33.33334; // ~30 FPS
+
+// How long to wait in ms. during shutdown for pi threads to close
+inline constexpr DWORD kKillTimeOutMs = static_cast<DWORD>(2000UL);
 
 #endif // PICALCWIN32_CONSTANTS_H_

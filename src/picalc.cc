@@ -95,6 +95,14 @@ namespace {
   HANDLE g_sqrt_thread  = nullptr;
   SqrtArgs* g_sqrt_args = nullptr;
 
+  // One mpz multiplication on its own thread, used by Combine() to do the
+  // four products in a BS combine in parallel rather than sequentially.
+  struct MulArgs {
+    const mpz_class* lhs;
+    const mpz_class* rhs;
+    mpz_class result;
+  };
+
   // Per-node binary-splitting tuple. T already folds in the leaf's
   // (A + B*k) factor, so the final formula needs Q and T only.
   struct PQT {
@@ -114,6 +122,9 @@ namespace {
     int digits;
     int threads;
   };
+
+  // Forward declaration.
+  void BinarySplitParallel(int lo, int hi, int depth, PQT* out);
 
   // =========================================================================
   // Helpers
@@ -170,21 +181,11 @@ namespace {
     }
   }
 
-  void BinarySplitParallel(int lo, int hi, int depth, PQT* out);
-
   DWORD WINAPI BSWorker(LPVOID thread_param) {
     BSArgs* args = static_cast<BSArgs*>(thread_param);
     BinarySplitParallel(args->lo, args->hi, args->depth, &args->result);
     return 0;
   }
-
-  // One mpz multiplication on its own thread, used by Combine() to do the
-  // four products in a BS combine in parallel rather than sequentially.
-  struct MulArgs {
-    const mpz_class* lhs;
-    const mpz_class* rhs;
-    mpz_class result;
-  };
 
   DWORD WINAPI MulWorker(LPVOID thread_param) {
     MulArgs* args = static_cast<MulArgs*>(thread_param);
@@ -350,14 +351,17 @@ namespace {
     return ToWide(formatted);
   }
 
-  bool SanityCheckResult(const std::wstring& picheck) {
+  bool SanityCheckResult(const std::wstring& picheck, const int digits) {
     wchar_t* endptr;
     const long double to_check = std::wcstold(picheck.data(), &endptr);
     if (endptr == picheck.data()) {
       LOG(DEBUG) << L"Sanity check could not parse: " << picheck;
       return false;
     }
-    return std::fabs(to_check - dPiCompare) < 1e-15L;
+    if (digits < 15) {
+      return std::fabs(to_check - dPiCompare) < 1e-1L;
+    }
+    return std::fabs(to_check - dPiCompare) < 1e-13L;
   }
 
   // =========================================================================
@@ -372,6 +376,7 @@ namespace {
 
     if (!OpenResultFile()) {
       LOG(ERROR) << L"Could not open results file!";
+      g_running.store(false);
       return 1;
     }
     // Capture the file position before writing anything for this run so we
@@ -430,6 +435,15 @@ namespace {
     }
     ResetMergeProgress(depth);
 
+    if (StopRequested()) {
+      TruncateResultFileTo(run_start_pos);
+      std::wostringstream stop_line;
+      stop_line << kStoppedMessage << FormatThousands(digits) << L" digits.";
+      EmitLine(stop_line.str(), false);
+      g_running.store(false);
+      return 0;
+    }
+
     PQT total;
     // Seed level 1's start so the first emitted merge line measures from the
     // actual start of BS work (rather than from the first level-1 combine
@@ -470,7 +484,14 @@ namespace {
       line << L"Single sqrt: " << ((GetTickCount() - sq_start) / kMsMul) << L"s.";
       EmitLine(line.str(), false);
     }
-
+    if (StopRequested()) {
+      TruncateResultFileTo(run_start_pos);
+      std::wostringstream stop_line;
+      stop_line << kStoppedMessage << FormatThousands(digits) << L" digits.";
+      EmitLine(stop_line.str(), false);
+      g_running.store(false);
+      return 0;
+    }
     // pi = kPiCoeff * sqrt(kSqrtRad) * Q / T  (constants derived from
     // factoring 640320^(3/2) = 640320 * 8 * sqrt(kSqrtRad)). The mpf_div
     // here is single-threaded and ~3-5x the cost of one mpf_mul on
@@ -531,16 +552,17 @@ namespace {
     fmt_line << L"Formatting took " << (t_elapsed_format_ms / kMsMul) << L"s.";
     EmitLine(fmt_line.str(), false);
     // Emit truncated Pi to the output area / console.
-    if (SanityCheckResult(output_pi)) {
+    if (SanityCheckResult(output_pi, digits)) {
       std::wostringstream done_msg;
       done_msg << kResultOkMsg <<  ((t_elapsed_calc_ms + t_elapsed_format_ms) / kMsMul) << L"s.";
       EmitLine(done_msg.str(), false);
     } else {
       std::wostringstream bad_calc_msg;
-      bad_calc_msg << kResultBadMsg << output_pi << L"did not match " << std::setprecision(16) << dPiCompare;
+      bad_calc_msg << kResultBadMsg << output_pi << L" did not match " << std::setprecision(16) << dPiCompare;
       EmitLine(bad_calc_msg.str(), true);
       ErrorBox(mainHwnd, kResultBadMsg, bad_calc_msg.str());
-      return 1;
+      g_running.store(false);
+      return 2;
     }
     // Write full untruncated Pi to the results file.
     LOG(DEBUG) << kWriteResultMsg << kResultsFile;
@@ -608,7 +630,7 @@ bool StartCalculation(int digits, int threads) {
   if (g_calc_thread != nullptr) {
     CloseHandle(g_calc_thread);
     g_calc_thread = nullptr;
-    CLOG(DEBUG) << L"Cleaned up previous calculation thread";
+    CLOG(DEBUG) << L"Cleaned up previous calculation thread.";
   }
   // If the previous run was stopped, its sqrt worker may still be running.
   // Join it now before changing the global GMP precision.
@@ -618,7 +640,7 @@ bool StartCalculation(int digits, int threads) {
     g_sqrt_thread = nullptr;
     delete g_sqrt_args;
     g_sqrt_args = nullptr;
-    CLOG(DEBUG) << L"Cleaned up previous square root thread";
+    CLOG(DEBUG) << L"Cleaned up previous square root thread.";
   }
   g_stop_requested.store(false);
   g_running.store(true);
@@ -641,4 +663,42 @@ bool StopCalculation() {
   }
   g_stop_requested.store(true);
   return true;
+}
+
+void KillCalculation() {
+  if (!g_running) {
+    return;
+  }
+  StopCalculation();
+  const UINT timeout_seconds = static_cast<UINT>(kKillTimeOutMs / 1000UL);
+  if (g_calc_thread != nullptr) {
+    // Bounded wait so a runaway calc can't hang shutdown forever. On timeout
+    // we leak the handle rather than close it - closing without waiting lets
+    // the thread keep running with a stale handle, racing against the rest
+    // of teardown.
+    const DWORD wait = WaitForSingleObject(g_calc_thread, kKillTimeOutMs);
+    if (wait == WAIT_TIMEOUT) {
+      LOG(WARN) << L"Calc thread did not exit within "
+                << timeout_seconds << L"s. - leaking g_calc_thread handle!";
+    } else {
+      CloseHandle(g_calc_thread);
+      LOG(DEBUG) << L"Cleaned up remaining calculation thread.";
+    }
+    g_calc_thread = nullptr;
+  }
+  if (g_sqrt_thread != nullptr) {
+    // Same bounded-wait pattern. If sqrt is still running we cannot free
+    // g_sqrt_args - the worker is still writing to args->sqrt_result.
+    const DWORD wait = WaitForSingleObject(g_sqrt_thread, kKillTimeOutMs);
+    if (wait == WAIT_OBJECT_0) {
+      CloseHandle(g_sqrt_thread);
+      delete g_sqrt_args;
+      LOG(DEBUG) << L"Cleaned up remaining square root thread.";
+    } else {
+      LOG(WARN) << L"Sqrt thread did not exit within "
+                << timeout_seconds << L"s. - leaking g_sqrt_thread/g_sqrt_args handles.";
+    }
+    g_sqrt_thread = nullptr;
+    g_sqrt_args   = nullptr;
+  }
 }

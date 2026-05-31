@@ -41,8 +41,8 @@ HDWP LayoutSysmonMetrics(HDWP hdwp, int x, int y, int w, int h);
 // Also takes the first CPU/mem snapshot so the first tick has a valid delta.
 bool StartSysmon(HWND hWnd, UINT interval_ms);
 
-// Stops the sysmon timer. Safe to call even if the timer was never started.
-void StopSysmon(HWND hWnd);
+// Stops the sysmon timer, stopping system monitoring.
+bool StopSysmon(HWND hWnd);
 
 // Must be called from the WM_TIMER handler when wParam == IDT_MONTIMER.
 // Queries CPU/mem stats and updates all metric value label controls.

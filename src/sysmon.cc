@@ -193,14 +193,17 @@ static void PaintGraph(HDC dc, const RECT& rc) {
     SelectObject(dc, s_hTotalLinePen);
     Polyline(dc, total_poly + 1, actual_pts);
 
-    // Pass 3: kernel fill (on top of total fill and total line).
-    SelectObject(dc, GetStockObject(NULL_PEN));
-    SelectObject(dc, s_hKernelFillBrush);
-    Polygon(dc, kernel_poly, poly_count);
+    // Passes 3-4: kernel fill + line, gated by the Settings menu toggle.
+    if (g_show_kernel_times) {
+      // Pass 3: kernel fill (on top of total fill and total line).
+      SelectObject(dc, GetStockObject(NULL_PEN));
+      SelectObject(dc, s_hKernelFillBrush);
+      Polygon(dc, kernel_poly, poly_count);
 
-    // Pass 4: kernel line (topmost).
-    SelectObject(dc, s_hKernelLinePen);
-    Polyline(dc, kernel_poly + 1, actual_pts);
+      // Pass 4: kernel line (topmost).
+      SelectObject(dc, s_hKernelLinePen);
+      Polyline(dc, kernel_poly + 1, actual_pts);
+    }
   }
 
   SelectObject(dc, hOldBrush);
@@ -208,10 +211,60 @@ static void PaintGraph(HDC dc, const RECT& rc) {
   RestoreDC(dc, saved_dc);
 }
 
+// Recursively walks `root` looking for the menu that directly contains the
+// item with command id `id`. Returns the containing HMENU, or nullptr if no
+// item with that id is found. Used so the graph's right-click popup can
+// piggyback on the existing "System Monitor" submenu from the .rc rather
+// than constructing a parallel menu - check state is automatically shared
+// because we hand TrackPopupMenu the same HMENU the main menu uses.
+static HMENU FindMenuContaining(HMENU root, UINT id) {
+  if (root == nullptr) {
+    return nullptr;
+  }
+  const int count = GetMenuItemCount(root);
+  for (int i = 0; i < count; ++i) {
+    // GetMenuItemID returns (UINT)-1 for popups; only direct MENUITEMs match.
+    if (GetMenuItemID(root, i) == id) {
+      return root;
+    }
+    HMENU sub = GetSubMenu(root, i);
+    if (sub != nullptr) {
+      HMENU found = FindMenuContaining(sub, id);
+      if (found != nullptr) {
+        return found;
+      }
+    }
+  }
+  return nullptr;
+}
+
 static LRESULT CALLBACK GraphProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
     case WM_ERASEBKGND:
       return TRUE;
+
+    case WM_CONTEXTMENU: {
+      // lParam packs the click position in SCREEN coords (LOWORD=x, HIWORD=y).
+      // The sentinel (-1, -1) means the menu was invoked from the keyboard
+      // (Shift+F10 / VK_APPS); anchor to the graph's top-left in that case.
+      POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+      if (pt.x == -1 && pt.y == -1) {
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+        pt.x = rc.left;
+        pt.y = rc.top;
+        ClientToScreen(hWnd, &pt);
+      }
+      HMENU sysmon_menu = FindMenuContaining(GetMenu(mainHwnd), IDM_KERNELTIMES);
+      if (sysmon_menu != nullptr) {
+        // Route commands to mainHwnd's WM_COMMAND so the existing
+        // IDM_KERNELTIMES / IDM_SLOW / IDM_MED / IDM_FAST handlers fire.
+        // No copy is made: the popup and the main menu share state because
+        // they reference the same HMENU.
+        TrackPopupMenu(sysmon_menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, mainHwnd, nullptr);
+      }
+      return 0;
+    }
 
     case WM_SIZE: {
       // Drop the backbuffer on resize; WM_PAINT recreates it at the new size.
@@ -472,10 +525,11 @@ bool StartSysmon(HWND hWnd, UINT interval_ms) {
   return SetTimer(hWnd, IDT_MONTIMER, interval_ms, nullptr) != 0;
 }
 
-void StopSysmon(HWND hWnd) {
-  if (hWnd != nullptr) {
-    KillTimer(hWnd, IDT_MONTIMER);
+bool StopSysmon(HWND hWnd) {
+  if (hWnd == nullptr) {
+    return false;
   }
+  return KillTimer(hWnd, IDT_MONTIMER);
 }
 
 void OnSysmonTick(HWND hWnd) {

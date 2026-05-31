@@ -15,7 +15,7 @@ bool RegisterResultWindowClass(HINSTANCE hInstance);
 void ToggleResultWindow(HWND parent);
 
 // Closes and destroys the viewer window. Safe to call when already closed.
-void CloseResultWindow();
+bool CloseResultWindow();
 
 // Returns true when the viewer window is currently open.
 bool IsResultWindowOpen();

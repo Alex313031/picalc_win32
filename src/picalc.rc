@@ -76,13 +76,17 @@ BEGIN
     END
     POPUP "&Settings"
     BEGIN
-        MENUITEM "S&ound?",              IDM_SOUND, CHECKED
+        MENUITEM "Status S&ounds",       IDM_SOUND, CHECKED
         MENUITEM "Colored Status &Pane", IDM_COLOREDOUTPUT, CHECKED
-        POPUP "&SysMon Speed"
+        POPUP "System &Monitor"
         BEGIN
-            MENUITEM "Slow (2.0s.)",   IDM_SLOW
-            MENUITEM "Medium (1.0s.)", IDM_MED, CHECKED
-            MENUITEM "Fast (0.5s.)",   IDM_FAST
+            MENUITEM "Show &Kernel Times", IDM_KERNELTIMES, CHECKED
+            POPUP "S&peed"
+            BEGIN
+                MENUITEM "Slow (2.0s.)",   IDM_SLOW
+                MENUITEM "Medium (1.0s.)", IDM_MED, CHECKED
+                MENUITEM "Fast (0.5s.)",   IDM_FAST
+            END
         END
     END
     POPUP "&Dev"

@@ -36,11 +36,12 @@
 #define IDM_SLOW                206 // Slow sysmon update speed
 #define IDM_MED                 207 // Med speed
 #define IDM_FAST                208 // Fast speed
-#define IDM_SOUND               209 // Whether to enable sounds app-wide
-#define IDM_CONSOLE             210 // Toggle console window
-#define IDM_COLOREDOUTPUT       211 // Whether output pane is b/w or color
-#define IDM_CLEARLOG            212 // Clears the log file
-#define IDM_OPENLOG             213 // Opens log file with notepad
+#define IDM_KERNELTIMES         209 // Whether to show kernel times
+#define IDM_SOUND               210 // Whether to enable sounds app-wide
+#define IDM_CONSOLE             211 // Toggle console window
+#define IDM_COLOREDOUTPUT       212 // Whether output pane is b/w or color
+#define IDM_CLEARLOG            213 // Clears the log file
+#define IDM_OPENLOG             214 // Opens log file with notepad
 
 /* Child control IDs (300-399), grouped by logical role */
 

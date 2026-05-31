@@ -17,8 +17,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 // Initializes app state
 bool InitApp(HWND hWnd);
 
-// Closes all windows and cleans up any resources.
-void ShutDownApp();
+// Closes all windows and cleans up any resources. True means a clean shutdown
+bool ShutDownApp();
 
 // Shows help
 bool LaunchHelp(HWND hWnd);

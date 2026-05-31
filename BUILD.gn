@@ -9,7 +9,7 @@ executable("picalc_win32") {
     ":picalc_win32_config",
   ]
   precompiled_header = "src/framework.h"
-  precompiled_source = "src/pch.cc"
+  precompiled_source = "src/pch.pch"
   sources = [
     "src/constants.h",
     "src/controls.cc",

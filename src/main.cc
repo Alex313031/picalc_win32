@@ -51,19 +51,9 @@ static HBITMAP s_main_oldMemBmp = nullptr;
 static int s_main_mem_cx        = 0;
 static int s_main_mem_cy        = 0;
 
-static void DestroyMainBackbuffer() {
-  if (s_main_memBmp != nullptr) {
-    SelectObject(s_main_memDC, s_main_oldMemBmp);
-    DeleteObject(s_main_memBmp);
-    s_main_memBmp    = nullptr;
-    s_main_oldMemBmp = nullptr;
-  }
-  if (s_main_memDC != nullptr) {
-    DeleteDC(s_main_memDC);
-    s_main_memDC = nullptr;
-  }
-  s_main_mem_cx = s_main_mem_cy = 0;
-}
+static std::string winever = ""; // For storing Wine version if applicable
+
+static bool s_clean_shutdown = false; // Whether shut down cleanly before destroy
 
 // =========================================================================
 // Globals
@@ -97,8 +87,13 @@ std::atomic<bool> g_running(false);
 // before playing the completion chime. Initial value matches the .rc's
 // CHECKED flag (true); ApplyMenuDefaults latches the .rc state into it
 // at startup and the IDM_SOUND handler keeps it in sync on toggle.
-bool g_sound_on       = true;
-bool g_colored_output = false;
+bool g_sound_on         = true;
+bool g_colored_output   = false;
+// Mirrors Settings -> System Monitor -> Show Kernel Times. PaintGraph reads
+// it to decide whether to draw the kernel fill + line on top of the total
+// CPU passes. Initial value matches the .rc's CHECKED flag (true); the
+// IDM_KERNELTIMES handler keeps it in sync on toggle.
+bool g_show_kernel_times = true;
 
 bool g_debug_mode = is_debug;
 // CLI flags. Set by ParseCommandLine before InitLogging runs so the log
@@ -117,7 +112,6 @@ bool can_use_582_controls = false;
 COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE); // Standard grey background
 
 bool is_on_wine            = false; // Whether we are on wine
-static std::string winever = "";
 
 // =========================================================================
 // Forward declarations
@@ -128,6 +122,7 @@ static int ShowVersionAndExit();
 static int ShowHelpAndExit();
 static void UpdateConsoleToggleMenu(HWND hWnd);
 static void ApplyMenuDefaults(HWND hWnd);
+static void DestroyMainBackbuffer();
 // =========================================================================
 // Functions
 // =========================================================================
@@ -477,6 +472,8 @@ static void ApplyMenuDefaults(HWND hWnd) {
   g_sound_on = IsMenuChecked(menu, IDM_SOUND);
   // Initial colored-output state from the .rc's CHECKED flag on IDM_COLOREDOUTPUT.
   g_colored_output = IsMenuChecked(menu, IDM_COLOREDOUTPUT);
+  // Initial kernel-times state from the .rc's CHECKED flag on IDM_KERNELTIMES.
+  g_show_kernel_times = IsMenuChecked(menu, IDM_KERNELTIMES);
   // Sysmon speed: whichever of the three speed items the .rc marks CHECKED.
   // Fall through to kMedSpeed if none are explicitly checked.
   UINT speed_id = IDM_MED;
@@ -789,6 +786,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           break;
         }
+        case IDM_KERNELTIMES: {
+          g_show_kernel_times = ToggleMenuCheck(hWnd, IDM_KERNELTIMES);
+          // Repaint the graph so the kernel fill + line appear / disappear
+          // immediately rather than waiting for the next sysmon tick.
+          // FALSE for erase: the graph is double-buffered and its WM_PAINT
+          // composites the full frame, so no parent erase is needed.
+          HWND graph = GetGraphHwnd();
+          if (graph != nullptr) {
+            InvalidateRect(graph, nullptr, FALSE);
+          }
+          LOG(INFO) << L"Kernel times " << (g_show_kernel_times ? L"shown" : L"hidden");
+          break;
+        }
         case IDM_CONSOLE: {
           // Flip the console window's visibility. If the .rc disabled
           // this feature outright, or if no console is attached
@@ -858,6 +868,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       LOG(DEBUG) << L"Window station is going down now!";
       return TRUE;
     case WM_DESTROY:
+      if (!s_clean_shutdown) {
+        LOG(ERROR) << L"WM_DESTROY without clean shutdown!";
+      }
+      if (g_running) {
+        LOG(WARN) << L"Exit requested while calculation in progress; worker is unwinding.";
+        KillCalculation();
+      }
       // Close the result file
       CloseResultFile();
       DestroyMainBackbuffer();
@@ -865,6 +882,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     case WM_NCDESTROY:
       mainHwnd = nullptr;
+      LOG(DEBUG) << L"Bye bye!";
       // Last message this window will receive. Close log file, and console
       // cleanly here, before the message loop sees the WM_QUIT that
       // WM_DESTROY's PostQuitMessage queued.
@@ -905,15 +923,23 @@ bool InitApp(HWND hWnd) {
   return true;
 }
 
-void ShutDownApp() {
+bool ShutDownApp() {
   // mainHwnd is cleared in WM_NCDESTROY; guard so a duplicate exit
   // path (e.g. WM_CLOSE arriving after WM_DESTROY's tear-down began)
   // doesn't pass NULL to DestroyWindow, which is undefined per MSDN.
-  if (mainHwnd != nullptr) {
-    StopSysmon(mainHwnd);
-    CloseResultWindow();
-    DestroyWindow(mainHwnd);
+  DCHECK(mainHwnd != nullptr);
+  if (mainHwnd == nullptr) {
+    return false;
   }
+  const bool stopped_calc   = g_running ? StopCalculation() : true;
+  const bool stopped_sysmon = StopSysmon(mainHwnd);
+  const bool closed_results = CloseResultWindow();
+  // Mark clean shutdown
+  if (stopped_calc && stopped_sysmon && closed_results) {
+    LOG(DEBUG) << L"Cleanly shutting down app...";
+    s_clean_shutdown = true;
+  }
+  return DestroyWindow(mainHwnd); // Send WM_DESTROY
 }
 
 bool LaunchHelp(HWND hWnd) {
@@ -950,4 +976,18 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
       break;
   }
   return FALSE;
+}
+
+static void DestroyMainBackbuffer() {
+  if (s_main_memBmp != nullptr) {
+    SelectObject(s_main_memDC, s_main_oldMemBmp);
+    DeleteObject(s_main_memBmp);
+    s_main_memBmp    = nullptr;
+    s_main_oldMemBmp = nullptr;
+  }
+  if (s_main_memDC != nullptr) {
+    DeleteDC(s_main_memDC);
+    s_main_memDC = nullptr;
+  }
+  s_main_mem_cx = s_main_mem_cy = 0;
 }
