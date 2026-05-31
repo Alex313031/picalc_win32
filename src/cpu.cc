@@ -5,10 +5,6 @@
 #include "constants.h"
 #include "utils.h"
 
-// NtQuerySystemInformation is NT-native, available on Win2K.
-// Loaded dynamically to keep the import table clean (no IAT entry).
-typedef LONG(WINAPI* FnNtQuerySystemInformation)(ULONG, PVOID, ULONG, PULONG);
-
 // Info class 8: per-logical-CPU performance counters.
 // KernelTime includes IdleTime; exclusive kernel = KernelTime - IdleTime.
 static constexpr ULONG kSysProcessorPerfInfo = 8;

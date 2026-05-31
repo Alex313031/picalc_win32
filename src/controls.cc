@@ -475,8 +475,11 @@ void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     params.title   = kThreadsDlgTitle;
     params.prompt  = kThreadsDlgPrompt;
     params.min_val = kMinNumThreads;
-    // Mirror the combobox filter: respect the same effective ceiling.
-    params.max_val    = GetEffectiveThreadMax();
+    // Custom dialog allows the full kMaxNumThreads ceiling - the system-CPU
+    // filter only applies to the dropdown options. If the user explicitly
+    // types a number higher than their core count via Custom, that's on
+    // them (use case: testing, benchmarking, or systems that misreport HT).
+    params.max_val    = kMaxNumThreads;
     params.edit_limit = 3; // 256 = 3 digits
     params.to_focus   = hThreadsCombo;
   }
