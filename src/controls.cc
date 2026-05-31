@@ -332,33 +332,36 @@ bool CreateChildControls(HWND parent) {
   for (const wchar_t* opt : kDigitOptions) {
     SendMessageW(hDigitsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
   }
+  // Effective thread ceiling - GetEffectiveThreadMax bakes in the policy:
+  // hard cap from kMaxNumThreads, system cap from logical CPU count, plus
+  // the single-CPU special case that allows 2 threads (see cpu.h).
+  const DWORD cpu_count = GetEffectiveThreadMax();
+
+  // Only add thread-count options that fit under cpu_count; "Custom" is always
+  // added (the custom-input dialog clamps to the same ceiling).
   for (const wchar_t* opt : kThreadsOptions) {
-    SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
+    const bool is_custom = (wcscmp(opt, L"Custom") == 0);
+    if (is_custom || wcstoul(opt, nullptr, 10) <= cpu_count) {
+      SendMessageW(hThreadsCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(opt));
+    }
   }
   // Default digit selection: 1M digits (index 6).
   SendMessageW(hDigitsCombo, CB_SETCURSEL, 6, 0);
 
-  // Default thread selection: exact logical CPU count, clamped to kMaxNumThreads.
-  const DWORD cpu_count = std::min(static_cast<DWORD>(kMaxNumThreads), GetLogicalProcessorCount());
-
-  // Check for an exact match in the non-Custom entries.
-  const int kNonCustomCount = static_cast<int>(ARRAYSIZE(kThreadsOptions)) - 1;
-  int threads_sel           = -1;
-  for (int i = 0; i < kNonCustomCount; ++i) {
-    if (static_cast<DWORD>(wcstoul(kThreadsOptions[i], nullptr, 10)) == cpu_count) {
-      threads_sel = i;
-      break;
-    }
-  }
-
-  if (threads_sel >= 0) {
-    SendMessageW(hThreadsCombo, CB_SETCURSEL, threads_sel, 0);
-    s_prev_threads_sel        = threads_sel;
+  // Default thread selection: exact logical CPU count. CB_FINDSTRINGEXACT
+  // matches against what was actually added to the combobox (filter-aware),
+  // so we don't have to track combo-vs-array indices separately.
+  wchar_t cpu_str[16];
+  swprintf(cpu_str, ARRAYSIZE(cpu_str), L"%u", cpu_count);
+  const int found = static_cast<int>(
+      SendMessageW(hThreadsCombo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1),
+                   reinterpret_cast<LPARAM>(cpu_str)));
+  if (found != CB_ERR) {
+    SendMessageW(hThreadsCombo, CB_SETCURSEL, found, 0);
+    s_prev_threads_sel        = found;
     s_threads_custom_injected = false;
   } else {
     // CPU count isn't a standard option - inject it before "Custom".
-    wchar_t cpu_str[16];
-    swprintf(cpu_str, ARRAYSIZE(cpu_str), L"%u", cpu_count);
     const int insert_at = static_cast<int>(SendMessageW(hThreadsCombo, CB_GETCOUNT, 0, 0)) - 1;
     SendMessageW(hThreadsCombo, CB_INSERTSTRING, insert_at, reinterpret_cast<LPARAM>(cpu_str));
     SendMessageW(hThreadsCombo, CB_SETCURSEL, insert_at, 0);
@@ -472,7 +475,8 @@ void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     params.title      = kThreadsDlgTitle;
     params.prompt     = kThreadsDlgPrompt;
     params.min_val    = kMinNumThreads;
-    params.max_val    = kMaxNumThreads;
+    // Mirror the combobox filter: respect the same effective ceiling.
+    params.max_val    = GetEffectiveThreadMax();
     params.edit_limit = 3; // 256 = 3 digits
     params.to_focus   = hThreadsCombo;
   }

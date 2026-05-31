@@ -59,6 +59,18 @@ DWORD GetLogicalProcessorCount() {
   return (si.dwNumberOfProcessors > 0) ? si.dwNumberOfProcessors : 1;
 }
 
+DWORD GetEffectiveThreadMax() {
+  static const DWORD reported = GetLogicalProcessorCount();
+  // Single-logical-CPU systems get an extra slot for the reasons in the
+  // header comment: misreported HT/SMP and the small throughput win from
+  // a +1 software thread under tight scheduling.
+  DWORD chosen = reported;
+  if (reported == 1) {
+    chosen = 2;
+  }
+  return std::min(static_cast<DWORD>(kMaxNumThreads), chosen);
+}
+
 // Previous snapshot: zeroed at startup. s_prev_count == 0 means no snapshot
 // taken yet; UpdateCpuStats saves the first snapshot and returns false.
 static SysProcPerfInfo s_prev_cpus[256] = {};
