@@ -46,7 +46,36 @@ executable("picalc_win32") {
     public_deps += [ "//src/gmp-ninja:gmp_static", ]
     deps += [ "//src/gmp-ninja:libgmp_static", ]
   }
-  output_name = "picalc"
+  if (!use_mmx && !use_sse && !use_sse2) {
+    output_name = "picalc_x87"
+  } else if (use_mmx && !use_sse && !use_sse2) {
+    output_name = "picalc_mmx"
+  } else if (use_sse && !use_sse2) {
+    output_name = "picalc_sse"
+  } else if (use_sse2 && !use_sse3) {
+    output_name = "picalc_sse2"
+  } else if (use_sse3 && !use_sse41) {
+    output_name = "picalc_sse3"
+  } else if (use_sse41 && !use_sse42) {
+    output_name = "picalc_sse41"
+  } else if (use_sse42 && !use_avx) {
+    output_name = "picalc_sse42"
+  } else if (use_avx && !use_avx2) {
+    output_name = "picalc_avx"
+  } else if (use_fma && !use_avx && !use_avx2) {
+    output_name = "picalc_fma"
+  } else if (use_aes && !use_avx && !use_avx2) {
+    output_name = "picalc_aes"
+  } else if (use_avx2 && !use_avx512) {
+    output_name = "picalc_avx2"
+  } else if (use_avx512) {
+    output_name = "picalc_avx512"
+  } else {
+    output_name = "picalc"
+  }
+  if (is_debug || dcheck_enabled) {
+    output_name += "_debug"
+  }
 }
 
 config("picalc_win32_config") {
