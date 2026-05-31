@@ -353,9 +353,9 @@ bool CreateChildControls(HWND parent) {
   // so we don't have to track combo-vs-array indices separately.
   wchar_t cpu_str[16];
   swprintf(cpu_str, ARRAYSIZE(cpu_str), L"%u", cpu_count);
-  const int found = static_cast<int>(
-      SendMessageW(hThreadsCombo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1),
-                   reinterpret_cast<LPARAM>(cpu_str)));
+  const int found =
+      static_cast<int>(SendMessageW(hThreadsCombo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1),
+                                    reinterpret_cast<LPARAM>(cpu_str)));
   if (found != CB_ERR) {
     SendMessageW(hThreadsCombo, CB_SETCURSEL, found, 0);
     s_prev_threads_sel        = found;
@@ -472,9 +472,9 @@ void HandleComboBoxes(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     params.edit_limit = 10; // 1,000,000,000 = 10 digits
     params.to_focus   = hDigitsCombo;
   } else {
-    params.title      = kThreadsDlgTitle;
-    params.prompt     = kThreadsDlgPrompt;
-    params.min_val    = kMinNumThreads;
+    params.title   = kThreadsDlgTitle;
+    params.prompt  = kThreadsDlgPrompt;
+    params.min_val = kMinNumThreads;
     // Mirror the combobox filter: respect the same effective ceiling.
     params.max_val    = GetEffectiveThreadMax();
     params.edit_limit = 3; // 256 = 3 digits

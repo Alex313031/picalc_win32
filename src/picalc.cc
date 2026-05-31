@@ -554,11 +554,12 @@ namespace {
     // Emit truncated Pi to the output area / console.
     if (SanityCheckResult(output_pi, digits)) {
       std::wostringstream done_msg;
-      done_msg << kResultOkMsg <<  ((t_elapsed_calc_ms + t_elapsed_format_ms) / kMsMul) << L"s.";
+      done_msg << kResultOkMsg << ((t_elapsed_calc_ms + t_elapsed_format_ms) / kMsMul) << L"s.";
       EmitLine(done_msg.str(), false);
     } else {
       std::wostringstream bad_calc_msg;
-      bad_calc_msg << kResultBadMsg << output_pi << L" did not match " << std::setprecision(16) << dPiCompare;
+      bad_calc_msg << kResultBadMsg << output_pi << L" did not match " << std::setprecision(16)
+                   << dPiCompare;
       EmitLine(bad_calc_msg.str(), true);
       ErrorBox(mainHwnd, kResultBadMsg, bad_calc_msg.str());
       g_running.store(false);
@@ -678,8 +679,8 @@ void KillCalculation() {
     // of teardown.
     const DWORD wait = WaitForSingleObject(g_calc_thread, kKillTimeOutMs);
     if (wait == WAIT_TIMEOUT) {
-      LOG(WARN) << L"Calc thread did not exit within "
-                << timeout_seconds << L"s. - leaking g_calc_thread handle!";
+      LOG(WARN) << L"Calc thread did not exit within " << timeout_seconds
+                << L"s. - leaking g_calc_thread handle!";
     } else {
       CloseHandle(g_calc_thread);
       LOG(DEBUG) << L"Cleaned up remaining calculation thread.";
@@ -695,8 +696,8 @@ void KillCalculation() {
       delete g_sqrt_args;
       LOG(DEBUG) << L"Cleaned up remaining square root thread.";
     } else {
-      LOG(WARN) << L"Sqrt thread did not exit within "
-                << timeout_seconds << L"s. - leaking g_sqrt_thread/g_sqrt_args handles.";
+      LOG(WARN) << L"Sqrt thread did not exit within " << timeout_seconds
+                << L"s. - leaking g_sqrt_thread/g_sqrt_args handles.";
     }
     g_sqrt_thread = nullptr;
     g_sqrt_args   = nullptr;

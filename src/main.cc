@@ -87,8 +87,8 @@ std::atomic<bool> g_running(false);
 // before playing the completion chime. Initial value matches the .rc's
 // CHECKED flag (true); ApplyMenuDefaults latches the .rc state into it
 // at startup and the IDM_SOUND handler keeps it in sync on toggle.
-bool g_sound_on         = true;
-bool g_colored_output   = false;
+bool g_sound_on       = true;
+bool g_colored_output = false;
 // Mirrors Settings -> System Monitor -> Show Kernel Times. PaintGraph reads
 // it to decide whether to draw the kernel fill + line on top of the total
 // CPU passes. Initial value matches the .rc's CHECKED flag (true); the
@@ -111,7 +111,7 @@ bool can_use_582_controls = false;
 
 COLORREF g_bkg_color = GetSysColor(COLOR_3DFACE); // Standard grey background
 
-bool is_on_wine            = false; // Whether we are on wine
+bool is_on_wine = false; // Whether we are on wine
 
 // =========================================================================
 // Forward declarations
